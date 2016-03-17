@@ -1,0 +1,133 @@
+<?php
+
+class IndieAuth extends WireData implements Module, ConfigurableModule
+{
+
+	/**
+	 * Return information about this module (required)
+	 * @access public
+	 */
+	public static function getModuleInfo()
+	{
+		return array(
+			'title' => 'IndieAuth',
+			'version' => 001,
+			'author' => 'gRegor Morrill',
+			'summary' => 'Allow users to sign in to your site using IndieAuth.',
+			'href' => 'https://indieauth.com',
+			'singular'	=> TRUE,
+			'permission' => 'page-view',
+		);
+	} # end method getModuleInfo()
+
+
+	/**
+	 * This method validates the authorization code with indieauth.com
+	 * @param string $code
+	 * @param bool $pw_login: Whether to attempt to log in to ProcessWire as well. Requires 'website' field added to user template.
+	 * @access public
+	 * @return bool
+	 */
+	public function verifyCode($code, $pw_login = FALSE)
+	{
+		$http = new WireHttp();
+
+		$client_id = 'https://' . $this->config->httpHost;
+		$redirect_uri = $this->page->httpUrl;
+		$query = http_build_query(compact('code', 'client_id', 'redirect_uri'));
+
+		$response = $http->post('https://indieauth.com/auth', $query);
+		parse_str($response, $params);
+
+		# if: indieauth.com error returned
+		if ( !empty($params['error']) )
+		{
+			$message = ( empty($params['error_description']) ) ? 'There was an error verifying your login.' : $params['error_description'];
+
+			return array(
+				'result' => FALSE,
+				'message' => $message,
+			);
+		} # end if
+
+		$this->wire('session')->set('indieauth_domain', $params['me']);
+
+		return array(
+			'result' => TRUE,
+		);
+	} # end method verifyCode()
+
+
+	/**
+	 * This method attempts to log a user into ProcessWire by their domain name.
+	 * Requires 'website' field in user template and called after successful IndieAuth
+	 * @access public
+	 * @return bool
+	 */
+	public function authenticateByDomain()
+	{
+		$me = $this->wire('session')->get('indieauth_domain');
+
+		# if: no IndieAuth domain in the session; halt
+		if ( !$me )
+		{
+			return FALSE;
+		} # end if
+
+		$selector = sprintf('website=%s|%s', $me, rtrim($me, '/'));
+		$users = $this->users->find($selector);
+
+		# if: exactly one ProcessWire user matches the website, log them in
+		if ( $users->count == 1 )
+		{
+			$user = $users->first();
+
+			$this->wire('session')->set('tmp_name', $user->name);
+			$this->wire('session')->set('tmp_pass', $user->pass);
+			$this->wire('session')->addHookAfter('authenticate', $this, 'authenticate');
+			$this->wire('session')->login($user->name, $user->pass);
+		} # end if
+
+	} # end method authenticateByDomain()
+
+
+	/**
+	 * Hook into the auth process to allow us to log users in.
+	 *
+	 * This works by setting a temporary "password" for the user in the session.
+	 * We check those against the values we supply ourself and return true.
+	 *
+	 * @param object $event     ProcessWire event
+	 * @return bool
+	 * @author craigrodway
+	 * @see https://github.com/craigrodway/LoginPersist/blob/master/LoginPersist.module
+	 */
+	public function authenticate($event)
+	{
+
+		# if: already authenticated
+		if ( $event->return )
+		{
+			return;
+		}
+
+		$sess_name = $this->wire('session')->get('tmp_name');
+		$sess_pass = $this->wire('session')->get('tmp_pass');
+
+		$user = $event->arguments('user');
+		$pass = $event->arguments('pass');
+
+		if ( $sess_name == $user->name && $sess_pass == $pass )
+		{
+			$this->wire('session')->remove('tmp_name');
+			$this->wire('session')->remove('tmp_pass');
+			$event->return = TRUE;
+		}
+		else
+		{
+			$event->return = FALSE;
+		}
+
+	} # end method authenticate()
+
+}
