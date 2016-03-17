@@ -15,7 +15,7 @@ class IndieAuth extends WireData implements Module, ConfigurableModule
 			'author' => 'gRegor Morrill',
 			'summary' => 'Allow users to sign in to your site using IndieAuth.',
 			'href' => 'https://indieauth.com',
-			'singular'	=> TRUE,
+			'singular' => TRUE,
 			'permission' => 'page-view',
 		);
 	} # end method getModuleInfo()
