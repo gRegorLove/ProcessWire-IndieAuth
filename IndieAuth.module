@@ -24,11 +24,10 @@ class IndieAuth extends WireData implements Module, ConfigurableModule
 	/**
 	 * This method validates the authorization code with indieauth.com
 	 * @param string $code
-	 * @param bool $pw_login: Whether to attempt to log in to ProcessWire as well. Requires 'website' field added to user template.
 	 * @access public
 	 * @return bool
 	 */
-	public function verifyCode($code, $pw_login = FALSE)
+	public function verifyCode($code)
 	{
 		$http = new WireHttp();
 
@@ -102,7 +101,7 @@ class IndieAuth extends WireData implements Module, ConfigurableModule
 	 * @author craigrodway
 	 * @see https://github.com/craigrodway/LoginPersist/blob/master/LoginPersist.module
 	 */
-	public function authenticate($event)
+	protected function authenticate($event)
 	{
 
 		# if: already authenticated

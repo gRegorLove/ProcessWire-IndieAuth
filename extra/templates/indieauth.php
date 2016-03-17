@@ -1,5 +1,9 @@
 <?php
 
+	/**
+	 * Minimal, sample IndieAuth template.
+	 */
+
 	if ( $input->get->code )
 	{
 		# get the IndieAuth module
