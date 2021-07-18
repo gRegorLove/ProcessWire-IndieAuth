@@ -1,0 +1,15 @@
+{
+    "require": {
+        "firebase/php-jwt": "^5.0",
+        "mf2/mf2": "^0.4.6",
+        "barnabywalters/mf-cleaner": "^0.1.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^8.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "IndieAuth\\": "src/IndieAuth/"
+        }
+    }
+}
