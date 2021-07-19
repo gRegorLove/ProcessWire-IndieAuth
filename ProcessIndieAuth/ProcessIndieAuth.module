@@ -504,28 +504,9 @@ class ProcessIndieAuth extends Process
                 $this->httpResponse('Error: Authorization header not found');
             }
 
-            $token = $this->lookupToken($bearer_token);
-            if (!$token) {
+            $response = $this->verifyToken($bearer_token);
+            if (!$response) {
                 $this->httpResponse('Invalid access token', 401);
-            }
-
-            $this->updateTokenLastAccessed((int) $token['id']);
-
-            $response = [
-                'me ' => $this->wire('urls')->httpRoot,
-                'client_id' => $token['client_id'],
-                'scope' => $token['scope'],
-                'active' => true,
-            ];
-
-            if ($token['expiration']) {
-                $dt_expiration = new DateTime($token['expiration']);
-                $dt_current = new DateTime();
-                if ($dt_current > $dt_expiration) {
-                    $response['active'] = false;
-                } else {
-                    $response['expires_in'] = $dt_expiration->getTimeStamp() - $dt_current->getTimeStamp();
-                }
             }
 
             $this->httpResponse($response, 200);
@@ -545,15 +526,49 @@ class ProcessIndieAuth extends Process
                 }
 
                 $token = $this->lookupToken($token_request);
-                if (!$token) {
-                    $this->revokeTokenById($token['id']);
+                if ($token && $this->revokeTokenById((int) $token['id'])) {
+                    $this->log->save('indieauth', sprintf('Revoked access token for %s with scope "%s"',
+                        $token['client_id'],
+                        $token['scope']
+                    ));
+
+                    $this->httpResponse('Access token revoked', 200);
                 }
 
-                $this->httpResponse('token revoked', 200);
+                $this->httpResponse('Error revoking access token', 500);
             }
 
             $this->redeemAuthorizationCode($request);
         }
+    }
+
+    public function verifyToken(string $bearer_token): ?array
+    {
+        $token = $this->lookupToken($bearer_token);
+        if (!$token) {
+            return null;
+        }
+
+        $this->updateTokenLastAccessed((int) $token['id']);
+
+        $response = [
+            'me ' => $this->wire('urls')->httpRoot,
+            'client_id' => $token['client_id'],
+            'scope' => $token['scope'],
+            'active' => true,
+        ];
+
+        if ($token['expiration']) {
+            $dt_expiration = new DateTime($token['expiration']);
+            $dt_current = new DateTime();
+            if ($dt_current > $dt_expiration) {
+                $response['active'] = false;
+            } else {
+                $response['expires_in'] = $dt_expiration->getTimeStamp() - $dt_current->getTimeStamp();
+            }
+        }
+
+        return $response;
     }
 
     /**
