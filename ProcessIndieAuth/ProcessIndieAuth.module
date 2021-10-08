@@ -111,6 +111,8 @@ class ProcessIndieAuth extends Process
         $parent = $this->pages->get('template=admin, name=access');
         $this->installPage('IndieAuth', $parent, 'IndieAuth');
 
+        $this->regenerateTokenSecret();
+
         $this->message('To complete installation, ensure the template files authorization-endpoint.php and token-endpoint.php are put in the /site/templates/ directory.');
     }
 
@@ -251,8 +253,7 @@ class ProcessIndieAuth extends Process
      */
     public function ___executeTokenSecret()
     {
-        $this->modules->saveConfig($this, 'token_secret', bin2hex(random_bytes(128)));
-        $this->message('IndieAuth secret re-generated');
+        $this->regenerateTokenSecret();
         $this->session->redirect($this->page->url, false);
     }
 
@@ -1103,6 +1104,12 @@ class ProcessIndieAuth extends Process
 
         $this->error($message);
         $this->session->redirect($url, false);
+    }
+
+    private function regenerateTokenSecret(): void
+    {
+        $this->modules->saveConfig($this, 'token_secret', bin2hex(random_bytes(128)));
+        $this->message('IndieAuth secret re-generated');
     }
 
     /**
