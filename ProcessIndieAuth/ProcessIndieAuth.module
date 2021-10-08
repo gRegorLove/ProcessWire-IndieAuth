@@ -552,7 +552,7 @@ class ProcessIndieAuth extends Process
         $this->updateTokenLastAccessed((int) $token['id']);
 
         $response = [
-            'me ' => $this->wire('urls')->httpRoot,
+            'me' => $this->wire('urls')->httpRoot,
             'client_id' => $token['client_id'],
             'scope' => $token['scope'],
             'active' => true,
@@ -1003,6 +1003,7 @@ class ProcessIndieAuth extends Process
         }
 
         if (is_array($response)) {
+            header('Content-Type: application/json; charset=UTF-8');
             echo json_encode($response);
         } else {
             echo $response;
