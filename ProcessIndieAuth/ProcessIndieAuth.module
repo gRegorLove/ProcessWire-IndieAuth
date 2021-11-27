@@ -111,6 +111,9 @@ class ProcessIndieAuth extends Process
         $parent = $this->pages->get('template=admin, name=access');
         $this->installPage('IndieAuth', $parent, 'IndieAuth');
 
+        # attempt to add the indieauth role
+        $this->installRole();
+
         $this->regenerateTokenSecret();
 
         $this->message('To complete installation, ensure the template files authorization-endpoint.php and token-endpoint.php are put in the /site/templates/ directory.');
@@ -1151,6 +1154,14 @@ class ProcessIndieAuth extends Process
             } else {
                 $this->message(sprintf('Skipped existing template: %s', $name));
             }
+        }
+    }
+
+    private function installRole(): void
+    {
+        $role = $this->roles->get('indieauth');
+        if ($role instanceof NullPage) {
+            $this->roles->add('indieauth');
         }
     }
 

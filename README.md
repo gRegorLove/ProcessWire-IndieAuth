@@ -15,6 +15,7 @@ IndieAuth is an identity layer on top of OAuth 2.0. It can be used to obtain acc
 * Copy the template files from `/extras/templates` into your `/site/templates` directory
 * Verify that the plugin installed public pages "Authorization Endpoint" and "Token Endpoint" as well as an admin page "IndieAuth" under the admin’s Access menu.
 * Update the home page template, adding the module’s `getLinkElements` to the `<head>` element:
+* Assign the `indieauth` role to any ProcessWire users that should be allowed to use IndieAuth
 
 ```html
 <head>
