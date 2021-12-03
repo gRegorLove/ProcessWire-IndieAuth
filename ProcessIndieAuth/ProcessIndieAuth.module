@@ -83,6 +83,18 @@ class ProcessIndieAuth extends Process
         $templates = file_get_contents(__DIR__ . '/data/templates.json');
         $this->importTemplates($templates);
 
+        # attempt to set up the indieauth-metadata page
+        $endpoint = $this->pages->get('template=indieauth-metadata-endpoint');
+        if ($endpoint instanceof NullPage) {
+            $endpoint = new Page();
+            $endpoint->template = 'indieauth-metadata-endpoint';
+            $endpoint->parent = 1;
+            $endpoint->title = 'IndieAuth Metadata Endpoint';
+            if ($endpoint->save()) {
+                $this->message(sprintf('Added page: %s', $endpoint->url));
+            }
+        }
+
         # attempt to set up the authorization-endpoint page
         $endpoint = $this->pages->get('template=authorization-endpoint');
         if ($endpoint instanceof NullPage) {
@@ -116,7 +128,7 @@ class ProcessIndieAuth extends Process
 
         $this->regenerateTokenSecret();
 
-        $this->message('To complete installation, ensure the template files authorization-endpoint.php and token-endpoint.php are put in the /site/templates/ directory.');
+        $this->message('To complete installation, ensure the template files indieauth-metadata-endpoint.php, authorization-endpoint.php, and token-endpoint.php are put in the /site/templates/ directory.');
     }
 
     public function ___uninstall(): void
@@ -326,6 +338,7 @@ class ProcessIndieAuth extends Process
             $url = Server::buildUrlWithQueryString($request['redirect_uri'], [
                 'code' => $code->value,
                 'state' => $request['state'],
+                'iss' => $this->urls->httpRoot,
             ]);
 
             $this->session->removeAllFor('IndieAuth');
@@ -393,6 +406,14 @@ class ProcessIndieAuth extends Process
     public function getLinkElements(): string
     {
         $output = '';
+
+        $endpoint = $this->pages->get('template=indieauth-metadata-endpoint');
+        if (!($endpoint instanceof NullPage) && $endpoint->viewable()) {
+            $output .= sprintf('<link rel="indieauth-metadata" href="%s">', $endpoint->url);
+        } else {
+            $output .= '<!-- IndieAuth: no public page found with template=indieauth-metadata-endpoint -->';
+        }
+
         $endpoint = $this->pages->get('template=authorization-endpoint');
         if (!($endpoint instanceof NullPage) && $endpoint->viewable()) {
             $output .= sprintf('<link rel="authorization_endpoint" href="%s">', $endpoint->url);
@@ -408,6 +429,41 @@ class ProcessIndieAuth extends Process
         }
 
         return $output;
+    }
+
+    /**
+     * Handle GET requests to the indieauth-metadata endpoint
+     */
+    public function metadataEndpoint(): void
+    {
+        if (!$this->input->requestMethod('GET')) {
+            $this->httpResponse('Method not supported');
+        }
+
+        $issuer = $this->urls->httpRoot;
+
+        $authorization_endpoint = '';
+        $endpoint = $this->pages->get('template=authorization-endpoint');
+        if (!($endpoint instanceof NullPage) && $endpoint->viewable()) {
+            $authorization_endpoint = $endpoint->httpUrl;
+        }
+
+        $token_endpoint = '';
+        $endpoint = $this->pages->get('template=token-endpoint');
+        if (!($endpoint instanceof NullPage) && $endpoint->viewable()) {
+            $token_endpoint = $endpoint->httpUrl;
+        }
+
+        $code_challenge_methods_supported = ['S256'];
+        $authorization_response_iss_parameter_supported = true;
+
+        $response = compact('issuer',
+            'authorization_endpoint',
+            'token_endpoint',
+            'code_challenge_methods_supported',
+            'authorization_response_iss_parameter_supported'
+        );
+        $this->httpResponse($response, 200);
     }
 
     /**
