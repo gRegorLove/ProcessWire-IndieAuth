@@ -136,6 +136,15 @@ class ProcessIndieAuth extends Process
         $this->database->query("DROP TABLE IF EXISTS `indieauth_authorization_codes`");
         $this->database->query("DROP TABLE IF EXISTS `indieauth_tokens`");
 
+        # attempt to un-publish the indieauth-metadata page
+        $endpoint = $this->pages->get('template=indieauth-metadata-endpoint');
+        if (!($endpoint instanceof NullPage)) {
+            $endpoint->addStatus(Page::statusUnpublished);
+            if ($endpoint->save()) {
+                $this->message(sprintf('Unpublished page: %s', $endpoint->url));
+            }
+        }
+
         # attempt to un-publish the authorization-endpoint page
         $endpoint = $this->pages->get('template=authorization-endpoint');
         if (!($endpoint instanceof NullPage)) {
@@ -408,21 +417,21 @@ class ProcessIndieAuth extends Process
         $output = '';
 
         $endpoint = $this->pages->get('template=indieauth-metadata-endpoint');
-        if (!($endpoint instanceof NullPage) && $endpoint->viewable()) {
+        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
             $output .= sprintf('<link rel="indieauth-metadata" href="%s">', $endpoint->url);
         } else {
             $output .= '<!-- IndieAuth: no public page found with template=indieauth-metadata-endpoint -->';
         }
 
         $endpoint = $this->pages->get('template=authorization-endpoint');
-        if (!($endpoint instanceof NullPage) && $endpoint->viewable()) {
+        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
             $output .= sprintf('<link rel="authorization_endpoint" href="%s">', $endpoint->url);
         } else {
             $output .= '<!-- IndieAuth: no public page found with template=authorization-endpoint -->';
         }
 
         $endpoint = $this->pages->get('template=token-endpoint');
-        if (!($endpoint instanceof NullPage) && $endpoint->viewable()) {
+        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
             $output .= sprintf('<link rel="token_endpoint" href="%s">', $endpoint->url);
         } else {
             $output .= '<!-- IndieAuth: no public page found with template=token-endpoint -->';
@@ -444,13 +453,13 @@ class ProcessIndieAuth extends Process
 
         $authorization_endpoint = '';
         $endpoint = $this->pages->get('template=authorization-endpoint');
-        if (!($endpoint instanceof NullPage) && $endpoint->viewable()) {
+        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
             $authorization_endpoint = $endpoint->httpUrl;
         }
 
         $token_endpoint = '';
         $endpoint = $this->pages->get('template=token-endpoint');
-        if (!($endpoint instanceof NullPage) && $endpoint->viewable()) {
+        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
             $token_endpoint = $endpoint->httpUrl;
         }
 
