@@ -49,6 +49,9 @@ class ProcessIndieAuth extends Process
     {
         require_once 'vendor/autoload.php';
         $this->addHookAfter('Session::loginSuccess', $this, 'loginSuccess');
+        if ($this->auto_revoke) {
+            $this->addHook('LazyCron::every12Hours', $this, 'revokeExpiredTokens');
+        }
     }
 
     public function ___install(): void
@@ -1034,6 +1037,19 @@ class ProcessIndieAuth extends Process
                     code_id = ?');
 
             return $statement->execute([$code_id]);
+        } catch(PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error revoking tokens: %s', $e->getMessage()));
+            return false;
+        }
+    }
+
+    public function revokeExpiredTokens()
+    {
+        try {
+            return $this->database->query('
+                DELETE FROM indieauth_tokens
+                WHERE
+                    expiration <= NOW()');
         } catch(PDOException $e) {
             $this->log->save('indieauth', sprintf('Error revoking tokens: %s', $e->getMessage()));
             return false;

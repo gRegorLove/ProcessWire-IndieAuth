@@ -19,6 +19,13 @@ $config = [
         'value' => 1209600,
         'required' => true,
     ],
+    'auto_revoke' => [
+        'type' => 'checkbox',
+        'label' => 'Automatically remove tokens after expiration',
+        'description' => 'Recommended. Periodically the site will check and remove expired tokens.',
+        'value' => 1,
+        'collapsed' => Inputfield::collapsedPopulated,
+    ],
     'token_secret' => [
         'type' => 'hidden',
     ],
