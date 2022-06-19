@@ -58,18 +58,18 @@ class ProcessIndieAuth extends Process
     {
         $this->database->query("
             CREATE TABLE IF NOT EXISTS `indieauth_authorization_codes` (
-                `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
                 `code_id` char(16) NOT NULL DEFAULT '',
                 `request` text NOT NULL,
                 `code` text NOT NULL,
                 `created` datetime NOT NULL,
                 `used` datetime DEFAULT NULL,
                 PRIMARY KEY (`id`)
-            ) DEFAULT CHARSET=utf8");
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
         $this->database->query("
             CREATE TABLE IF NOT EXISTS `indieauth_tokens` (
-                `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
                 `code_id` char(16) NOT NULL DEFAULT '',
                 `ending` varchar(10) NOT NULL DEFAULT '',
                 `client_name` varchar(255) NOT NULL DEFAULT '',
@@ -80,8 +80,10 @@ class ProcessIndieAuth extends Process
                 `last_accessed` datetime DEFAULT NULL,
                 `expiration` datetime DEFAULT NULL,
                 `token` varchar(255) NOT NULL DEFAULT '',
+                `refresh_expiration` datetime DEFAULT NULL,
+                `refresh_token` varchar(255) NOT NULL DEFAULT '',
                 PRIMARY KEY (`id`)
-            ) DEFAULT CHARSET=utf8");
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
         $templates = file_get_contents(__DIR__ . '/data/templates.json');
         $this->importTemplates($templates);
@@ -117,6 +119,18 @@ class ProcessIndieAuth extends Process
             $endpoint->template = 'token-endpoint';
             $endpoint->parent = 1;
             $endpoint->title = 'Token Endpoint';
+            if ($endpoint->save()) {
+                $this->message(sprintf('Added page: %s', $endpoint->url));
+            }
+        }
+
+        # attempt to set up the token-revocation-endpoint page
+        $endpoint = $this->pages->get('template=token-revocation-endpoint');
+        if ($endpoint instanceof NullPage) {
+            $endpoint = new Page();
+            $endpoint->template = 'token-revocation-endpoint';
+            $endpoint->parent = 1;
+            $endpoint->title = 'Token Revocation Endpoint';
             if ($endpoint->save()) {
                 $this->message(sprintf('Added page: %s', $endpoint->url));
             }
@@ -182,10 +196,12 @@ class ProcessIndieAuth extends Process
                 return compact('table');
             }
 
+            $input = $this->wire('input');
+
             # set up base PageArray, used for pagination links
             $items_per_page = 10;
-            $start = ($this->input->pageNum - 1) * $items_per_page;
-            $end = $this->input->pageNum * $items_per_page;
+            $start = ($input->pageNum - 1) * $items_per_page;
+            $end = $input->pageNum * $items_per_page;
 
             $results = new PageArray();
             $results->setTotal($total);
@@ -286,6 +302,7 @@ class ProcessIndieAuth extends Process
 
     public function ___executeAuthorization(): array
     {
+        $input = $this->wire('input');
         $request = $this->session->getFor('IndieAuth', 'request');
         $client = $this->session->getfor('IndieAuth', 'client');
 
@@ -294,7 +311,7 @@ class ProcessIndieAuth extends Process
             $this->session->redirect($this->wire('config')->urls->admin, false);
         }
 
-        if ($this->input->requestMethod('GET')) {
+        if ($input->requestMethod('GET')) {
             $url = $client['url'] ?? $request['client_id'];
             $name = $client['name'] ?? $request['client_id'];
             $domain = parse_url($this->urls->httpRoot, PHP_URL_HOST);
@@ -332,15 +349,15 @@ class ProcessIndieAuth extends Process
                 'token_lifetime',
                 'redirect_uri'
             );
-        } elseif ($this->input->requestMethod('POST')) {
-            $scopes = array_filter($this->input->post('scopes'));
+        } elseif ($input->requestMethod('POST')) {
+            $scopes = array_filter($input->post('scopes'));
             if ($scopes) {
                 $request['scope'] = implode(' ', $scopes);
             }
 
             $this->session->setFor('IndieAuth', 'request', $request);
 
-            if ($this->input->post('expiration') == 'normal') {
+            if ($input->post('expiration') == 'normal') {
                 $this->session->setFor('IndieAuth', 'token_lifetime', $this->token_lifetime);
             }
 
@@ -368,8 +385,10 @@ class ProcessIndieAuth extends Process
         Wire::setFuel('processHeadline', 'Revoke Access Token');
         $this->breadcrumbs->add(new Breadcrumb($this->page->url, 'IndieAuth'));
 
-        if ($this->input->requestMethod('GET')) {
-            if (!($id = $this->input->urlSegment2)) {
+        $input = $this->wire('input');
+
+        if ($input->requestMethod('GET')) {
+            if (!($id = $input->urlSegment2)) {
                 $this->handleErrorRedirect('Missing ID in URL');
             }
 
@@ -400,9 +419,9 @@ class ProcessIndieAuth extends Process
             } catch (PDOException $e) {
                 $this->handleErrorRedirect($e->getMessage());
             }
-        } elseif ($this->input->requestMethod('POST')) {
+        } elseif ($input->requestMethod('POST')) {
             try {
-                $this->revokeTokenById((int) $this->input->post('id'));
+                $this->revokeTokenById((int) $input->post('id'));
             } catch (PDOException $e) {
                 $this->handleErrorRedirect($e->getMessage());
             }
@@ -417,30 +436,30 @@ class ProcessIndieAuth extends Process
      */
     public function getLinkElements(): string
     {
-        $output = '';
+        $output = [];
 
         $endpoint = $this->pages->get('template=indieauth-metadata-endpoint');
         if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
-            $output .= sprintf('<link rel="indieauth-metadata" href="%s">', $endpoint->url);
+            $output[] = sprintf('<link rel="indieauth-metadata" href="%s">', $endpoint->url);
         } else {
-            $output .= '<!-- IndieAuth: no public page found with template=indieauth-metadata-endpoint -->';
+            $output[] = '<!-- IndieAuth: no public page found with template=indieauth-metadata-endpoint -->';
         }
 
         $endpoint = $this->pages->get('template=authorization-endpoint');
         if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
-            $output .= sprintf('<link rel="authorization_endpoint" href="%s">', $endpoint->url);
+            $output[] = sprintf('<link rel="authorization_endpoint" href="%s">', $endpoint->url);
         } else {
-            $output .= '<!-- IndieAuth: no public page found with template=authorization-endpoint -->';
+            $output[] = '<!-- IndieAuth: no public page found with template=authorization-endpoint -->';
         }
 
         $endpoint = $this->pages->get('template=token-endpoint');
         if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
-            $output .= sprintf('<link rel="token_endpoint" href="%s">', $endpoint->url);
+            $output[] = sprintf('<link rel="token_endpoint" href="%s">', $endpoint->url);
         } else {
-            $output .= '<!-- IndieAuth: no public page found with template=token-endpoint -->';
+            $output[] = '<!-- IndieAuth: no public page found with template=token-endpoint -->';
         }
 
-        return $output;
+        return implode(PHP_EOL, $output);
     }
 
     /**
@@ -448,7 +467,9 @@ class ProcessIndieAuth extends Process
      */
     public function metadataEndpoint(): void
     {
-        if (!$this->input->requestMethod('GET')) {
+        $input = $this->wire('input');
+
+        if (!$input->requestMethod('GET')) {
             $this->httpResponse('Method not supported');
         }
 
@@ -466,12 +487,22 @@ class ProcessIndieAuth extends Process
             $token_endpoint = $endpoint->httpUrl;
         }
 
+        $revocation_endpoint  = '';
+        $endpoint = $this->pages->get('template=token-revocation-endpoint');
+        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
+            $revocation_endpoint  = $endpoint->httpUrl;
+        }
+
+        $revocation_endpoint_auth_methods_supported = ['none'];
         $code_challenge_methods_supported = ['S256'];
         $authorization_response_iss_parameter_supported = true;
 
-        $response = compact('issuer',
+        $response = compact(
+            'issuer',
             'authorization_endpoint',
             'token_endpoint',
+            'revocation_endpoint',
+            'revocation_endpoint_auth_methods_supported',
             'code_challenge_methods_supported',
             'authorization_response_iss_parameter_supported'
         );
@@ -486,7 +517,7 @@ class ProcessIndieAuth extends Process
         $input = $this->wire('input');
         $user = $this->wire('user');
 
-        if ($input->requestMethod() === 'GET') {
+        if ($input->requestMethod('GET')) {
             $request = $input->get()->getArray();
             $required_fields = array_fill_keys([
                 'client_id',
@@ -557,20 +588,29 @@ class ProcessIndieAuth extends Process
             # redirct to ProcessWire login
             $this->session->redirect($this->wire('config')->urls->admin, false);
 
-        } elseif ($input->requestMethod() === 'POST') {
-            // $request = $input->post()->getArray();
-            $this->redeemAuthorizationCode($input->post()->getArray());
+        } elseif ($input->requestMethod('POST')) {
+            $request = $input->post()->getArray();
+            if ($this->isRedeemAuthorizationCodeRequest($request)) {
+                $this->redeemAuthorizationCode($request);
+            }
+
+            # default: invalid request
+            $this->httpResponse([
+                'error' => 'invalid_request',
+                'error_description' => 'Invalid request',
+            ]);
         }
     }
 
     /**
-     * Handle GET and POST requests to the token endpoint
+     * Handle token endpoint requests
      */
     public function tokenEndpoint(): void
     {
         $input = $this->wire('input');
 
-        if ($input->requestMethod() === 'GET') {
+        if ($input->requestMethod('GET')) {
+            # backcompat: overloaded token endpoint can introspect access tokens
             $bearer_token = $this->getBearerToken();
             if (!$bearer_token) {
                 $this->httpResponse('Error: Authorization header not found');
@@ -578,42 +618,96 @@ class ProcessIndieAuth extends Process
 
             $response = $this->verifyToken($bearer_token);
             if (!$response) {
-                $this->httpResponse('Invalid access token', 401);
+                $this->httpResponse(['active' => false], 200);
             }
 
             $this->httpResponse($response, 200);
-        } elseif ($input->requestMethod() === 'POST') {
+        } elseif ($input->requestMethod('POST')) {
             $request = $input->post()->getArray();
 
-            # token revoke request
-            if (array_intersect_key($request, array_fill_keys(['action', 'token'], ''))) {
-                $action = $request['action'] ?? '';
-                $token_request = $request['token'] ?? '';
-
-                if ($action !== 'revoke') {
-                    $this->httpResponse([
-                        'error' => 'invalid_request',
-                        'error_description' => 'action must be "revoke"',
-                    ]);
-                }
-
-                $token = $this->lookupToken($token_request);
-                if ($token && $this->revokeTokenById((int) $token['id'])) {
-                    $this->log->save('indieauth', sprintf('Revoked access token for %s with scope "%s"',
-                        $token['client_id'],
-                        $token['scope']
-                    ));
-
-                    $this->httpResponse('Access token revoked', 200);
-                }
-
-                $this->httpResponse('Error revoking access token', 500);
+            if ($this->isRedeemAuthorizationCodeRequest($request)) {
+                $this->redeemAuthorizationCode($request);
             }
 
-            $this->redeemAuthorizationCode($request);
+            if ($this->isRefreshAccessTokenRequest($request)) {
+                $this->refreshAccessToken($request);
+            }
+
+            # backcompat: overloaded token endpoint with `action=revoke` request
+            if (array_intersect_key($request, array_fill_keys(['action', 'token'], ''))) {
+                $this->tokenRevocationEndpoint();
+            }
+
+            # default: invalid request
+            $this->httpResponse([
+                'error' => 'invalid_request',
+                'error_description' => 'Invalid request',
+            ]);
         }
     }
 
+    /**
+     * Handle token revocation requests
+     * This endpoint does not currently require authorization
+     * @see https://indieauth.spec.indieweb.org/#token-revocation
+     */
+    public function tokenRevocationEndpoint(): void
+    {
+        $input = $this->wire('input');
+
+        if ($input->requestMethod('GET')) {
+            $this->httpResponse('Method not supported', 405, ['Allow' => 'POST']);
+        }
+
+        $request = $input->post()->getArray();
+
+        $token_request = $request['token'] ?? null;
+        if (!$token_request) {
+            $this->httpResponse([
+                'error' => 'invalid_request',
+                'error_description' => 'Missing `token` parameter',
+            ]);
+        }
+
+        /**
+         * `action=revoke` is backcompat.
+         * Effectively ignored now, but error if `action` is provided
+         * and has an unexpected value.
+         */
+        $action = $request['action'] ?? null;
+        if ($action && ($action != 'revoke')) {
+            $this->httpResponse([
+                'error' => 'invalid_request',
+                'error_description' => 'Invalid `action` parameter. Note that `action` is no longer needed for token revocation requests.',
+            ]);
+        }
+
+        $token = $this->lookupToken($token_request);
+        if ($token && $this->revokeTokenById((int) $token['id'])) {
+            $this->log->save('indieauth', sprintf('Revoked access token for %s with scope "%s"',
+                $token['client_id'],
+                $token['scope']
+            ));
+        }
+
+        # always respond with HTTP 200, even if it was not successful
+        $this->httpResponse('', 200);
+    }
+
+    /**
+     * Verify an access token
+     *
+     * This method is intended to be used by other software
+     * interacting with this endpoint, e.g. the ProcessWire-Micropub
+     * module will use it to verify tokens in Micropub requests.
+     *
+     * If token is valid, return an array that follows the spec's
+     * "Access Token Verification Response" section. Otherwise
+     * return null.
+     *
+     * If the Token Introspection Endpoint is introduced, a separate
+     * method could call this and then return the JSON.
+     */
     public function verifyToken(string $bearer_token): ?array
     {
         $token = $this->lookupToken($bearer_token);
@@ -643,13 +737,31 @@ class ProcessIndieAuth extends Process
         return $response;
     }
 
+    private function isRedeemAuthorizationCodeRequest(array $request): bool
+    {
+        $required_fields = array_fill_keys([
+            'grant_type',
+            'code',
+            'client_id',
+            'redirect_uri',
+        ], 0);
+
+        # verify required fields
+        $missing_fields = array_diff_key($required_fields, $request);
+        if (count($missing_fields) > 0) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Handle an authorization code sent to one of the endpoints
      * @see https://indieauth.spec.indieweb.org/#redeeming-the-authorization-code
      */
     private function redeemAuthorizationCode(array $request): void
     {
-        $required_fields = array_fill_keys([
+        /*$required_fields = array_fill_keys([
             'grant_type',
             'code',
             'client_id',
@@ -665,7 +777,7 @@ class ProcessIndieAuth extends Process
                     implode(', ', array_keys($missing_fields))
                 )
             ]);
-        }
+        }*/
 
         # default grant_type if none provided
         if (!array_key_exists('grant_type', $request)) {
@@ -687,25 +799,21 @@ class ProcessIndieAuth extends Process
 
         # authorization_code has scope(s), generate an access token
         if ($scope) {
-            $token = $this->addToken($decoded);
-            if (!$token) {
+            $token_data = $this->addToken($decoded);
+            if (!$token_data) {
                 $this->httpResponse([
                     'error' => 'internal_error',
                     'error_description' => 'An unexpected error occurred while redeeming the authorization code',
                 ], 500);
             }
 
-            $response = [
-                'me' => $this->wire('urls')->httpRoot,
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'scope' => $scope,
-            ];
-
-            $token_lifetime = $decoded['token_lifetime'] ?? null;
-            if ($token_lifetime) {
-                $response['expires_in'] = $token_lifetime;
-            }
+            $response = array_merge(
+                [
+                    'me' => $this->wire('urls')->httpRoot,
+                    'scope' => $scope,
+                ],
+                $token_data
+            );
 
             $this->log->save('indieauth', sprintf('Granted access token to %s with scope "%s"', $client_id, $scope));
             $this->httpResponse($response, 200);
@@ -715,6 +823,83 @@ class ProcessIndieAuth extends Process
         $me = $this->wire('urls')->httpRoot;
         $response = compact('me');
         $this->log->save('indieauth', sprintf('Signed in to %s as %s', $request['client_id'], $me));
+        $this->httpResponse($response, 200);
+    }
+
+    private function isRefreshAccessTokenRequest(array $request): bool
+    {
+        $required_fields = array_fill_keys([
+            'grant_type',
+            'refresh_token',
+            'client_id',
+        ], 0);
+
+        # verify required fields
+        $missing_fields = array_diff_key($required_fields, $request);
+        if (count($missing_fields) > 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function refreshAccessToken(array $request): void
+    {
+        /*$required_fields = array_fill_keys([
+            'grant_type',
+            'refresh_token',
+            'client_id',
+        ], 0);
+
+        # verify required fields
+        $missing_fields = array_diff_key($required_fields, $request);
+        if (count($missing_fields) > 0) {
+            $this->httpResponse([
+                'error' => 'invalid_request',
+                'error_description' => sprintf('Missing required request parameters: %s',
+                    implode(', ', array_keys($missing_fields))
+                )
+            ]);
+        }*/
+
+        # verify grant_type
+        if ($request['grant_type'] != 'refresh_token') {
+            $this->httpResponse([
+                'error' => 'unsupported_grant_type',
+                'error_description' => 'grant_type must be "refresh_token"'
+            ]);
+        }
+
+        $original_token = $this->lookupRefreshToken($request['refresh_token'], $request['client_id']);
+        if (!$original_token) {
+            $this->httpResponse([
+                'error' => 'forbidden',
+                'error_description' => 'Invalid refresh token',
+            ], 403);
+        }
+
+        $token_data = $this->updateToken((int) $original_token['id']);
+        if (!$token_data) {
+            $this->httpResponse([
+                'error' => 'internal_error',
+                'error_description' => 'An unexpected error occurred while refreshing the access token',
+            ], 500);
+        }
+
+        $response = array_merge(
+            [
+                'me' => $this->wire('urls')->httpRoot,
+                'scope' => $original_token['scope'],
+            ],
+            $token_data
+        );
+
+        $this->log->save('indieauth',
+            sprintf('Granted refreshed access token to %s with scope "%s"',
+                $request['client_id'],
+                $original_token['scope']
+            )
+        );
         $this->httpResponse($response, 200);
     }
 
@@ -913,15 +1098,29 @@ class ProcessIndieAuth extends Process
         }
     }
 
-    protected function addToken(array $authorization): ?string
+    private function addToken(array $authorization): ?array
     {
         try {
+            $token = bin2hex(random_bytes(128));
+            $refresh_token = bin2hex(random_bytes(128));
+
+            $response = [
+                'token_type' => 'Bearer',
+                'access_token' => $token,
+                'refresh_token' => $refresh_token,
+            ];
+
             $expiration = null;
+            $refresh_expiration = null;
             $token_lifetime = $authorization['token_lifetime'] ?? null;
             if ($token_lifetime) {
                 $dt = new DateTime();
                 $dt->modify('+ ' . $token_lifetime . ' seconds');
                 $expiration = $dt->format('Y-m-d H:i:s');
+                $response['expires_in'] = $token_lifetime;
+
+                $dt->modify('+ ' . $token_lifetime . ' seconds');
+                $refresh_expiration = $dt->format('Y-m-d H:i:s');
             }
 
             $statement = $this->database->prepare('
@@ -934,9 +1133,10 @@ class ProcessIndieAuth extends Process
                     ,`scope` = ?
                     ,issued_at = NOW()
                     ,expiration = ?
-                    ,token = ?');
+                    ,token = ?
+                    ,refresh_expiration = ?
+                    ,refresh_token = ?');
 
-            $token = bin2hex(random_bytes(128));
             $statement->execute([
                 $authorization['id'],
                 substr($token, -7),
@@ -946,11 +1146,57 @@ class ProcessIndieAuth extends Process
                 $authorization['scope'] ?? '',
                 $expiration,
                 hash('sha256', $token),
+                $refresh_expiration,
+                hash('sha256', $refresh_token),
             ]);
 
-            return $token;
+            return $response;
         } catch (PDOException $e) {
             $this->log->save('indieauth', sprintf('Error adding token: %s', $e->getMessage()));
+            return null;
+        }
+    }
+
+    private function updateToken(int $id): ?array
+    {
+        try {
+            $dt = new DateTime('+ ' . $this->token_lifetime . ' seconds');
+            $expiration = $dt->format('Y-m-d H:i:s');
+            $token = bin2hex(random_bytes(128));
+
+            $dt->modify('+ ' . $this->token_lifetime . ' seconds');
+            $refresh_expiration = $dt->format('Y-m-d H:i:s');
+            $refresh_token = bin2hex(random_bytes(128));
+
+            $response = [
+                'token_type' => 'Bearer',
+                'access_token' => $token,
+                'refresh_token' => $refresh_token,
+                'expires_in' => $this->token_lifetime,
+            ];
+
+            $statement = $this->database->prepare('
+                UPDATE indieauth_tokens SET
+                    ending = ?
+                    ,expiration = ?
+                    ,token = ?
+                    ,refresh_expiration = ?
+                    ,refresh_token = ?
+                WHERE
+                    id = ?');
+
+            $statement->execute([
+                substr($token, -7),
+                $expiration,
+                hash('sha256', $token),
+                $refresh_expiration,
+                hash('sha256', $refresh_token),
+                $id,
+            ]);
+
+            return $response;
+        } catch (PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error updating token: %s', $e->getMessage()));
             return null;
         }
     }
@@ -995,7 +1241,11 @@ class ProcessIndieAuth extends Process
                 FROM
                     indieauth_tokens
                 WHERE
-                    token = ?');
+                    token = ?
+                    AND (
+                        expiration IS NULL
+                        OR expiration > NOW()
+                    )');
 
             $statement->execute([
                 hash('sha256', $token),
@@ -1009,6 +1259,52 @@ class ProcessIndieAuth extends Process
             return $statement->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             $this->log->save('indieauth', sprintf('Error looking up token: %s', $e->getMessage()));
+            return null;
+        }
+    }
+
+    /**
+     * Lookup refresh token by un-hashed token value
+     * @param string $refresh_token un-hashed token
+     * @param string $client_id
+     */
+    private function lookupRefreshToken(string $refresh_token, string $client_id): ?array
+    {
+        try {
+            $statement = $this->database->prepare('
+                SELECT
+                    id
+                    ,ending
+                    ,client_name
+                    ,client_icon
+                    ,client_id
+                    ,scope
+                    ,issued_at
+                    ,last_accessed
+                    ,expiration
+                FROM
+                    indieauth_tokens
+                WHERE
+                    refresh_token = ?
+                    AND client_id = ?
+                    AND (
+                        refresh_expiration IS NULL
+                        OR refresh_expiration > NOW()
+                    )');
+
+            $statement->execute([
+                hash('sha256', $refresh_token),
+                $client_id,
+            ]);
+
+            if ($statement->rowCount() === 0) {
+                $this->log->save('indieauth', sprintf('Unable to find refresh token ending with "%s"', substr($refresh_token, -7)));
+                return null;
+            }
+
+            return $statement->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error looking up refresh token: %s', $e->getMessage()));
             return null;
         }
     }
@@ -1049,7 +1345,11 @@ class ProcessIndieAuth extends Process
             return $this->database->query('
                 DELETE FROM indieauth_tokens
                 WHERE
-                    expiration <= NOW()');
+                    expiration <= NOW()
+                    AND (
+                        refresh_expiration IS NULL
+                        OR refresh_expiration <= NOW()
+                    )');
         } catch(PDOException $e) {
             $this->log->save('indieauth', sprintf('Error revoking tokens: %s', $e->getMessage()));
             return false;
@@ -1079,17 +1379,26 @@ class ProcessIndieAuth extends Process
         $this->session->redirect($url, false);
     }
 
-    private function httpResponse($response, int $http_status = 400): void
+    private function httpResponse($response, int $http_status = 400, array $headers = []): void
     {
-        http_response_code($http_status);
+        foreach ($headers as $key => $value) {
+            $header = sprintf('%s: %s', $key, $value);
+            header($header);
+        }
 
         if ($http_status === 401) {
             header(sprintf('WWW-Authenticate: Bearer realm="%s"', $this->urls->httpRoot));
         }
 
+        http_response_code($http_status);
+
         if (is_array($response)) {
+            $flags = 0;
+            if (array_key_exists('pretty', $_GET)) {
+                $flags = JSON_PRETTY_PRINT;
+            }
             header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode($response);
+            echo json_encode($response, $flags);
         } else {
             echo $response;
         }

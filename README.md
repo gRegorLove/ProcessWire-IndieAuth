@@ -1,5 +1,5 @@
 # ProcessWire IndieAuth Module
-A [ProcessWire](http://processwire.com) module to use your domain as an [IndieAuth](https://indieauth.spec.indieweb.org/) provider.
+A [ProcessWire](https://processwire.com) module to use your domain as an [IndieAuth](https://indieauth.spec.indieweb.org/) provider.
 
 IndieAuth is an identity layer on top of OAuth 2.0. It can be used to obtain access tokens as well as authenticate users.
 
@@ -11,7 +11,12 @@ IndieAuth is an identity layer on top of OAuth 2.0. It can be used to obtain acc
 * Upload the plugin files to the `/site/modules` directory
 * Install the module from the ProcessWire admin
 * Copy the template files from `/extras/templates` into your `/site/templates` directory
-* Verify that the plugin installed public pages "Authorization Endpoint" and "Token Endpoint" as well as an admin page "IndieAuth" under the admin’s Access menu.
+* Verify that the plugin installed pages:
+  * IndieAuth Metadata Endpoint
+  * Authorization Endpoint
+  * Token Endpoint
+  * Token Revocation Endpoint
+  * IndieAuth page under the admin’s Access menu
 * Assign the `indieauth` role to any ProcessWire users that should be allowed to use IndieAuth
 * Update the home page template, adding the module’s `getLinkElements` to the `<head>` element:
 
@@ -30,6 +35,10 @@ This should result in three `<link>` elements in the source HTML:
 	<link rel="token_endpoint" href="/token-endpoint/">
 </head>
 ```
-# License
+
+## Changelog
+* [Changelog](CHANGELOG.md)
+
+## License
 Copyright 2021 by gRegor Morrill. Licensed under the MIT license https://opensource.org/licenses/MIT
 

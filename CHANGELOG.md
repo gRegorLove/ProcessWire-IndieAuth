@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Refactor: use IndieAuth protocol to sign in to applications using your domain name and optionally grant access tokens
-- Follows [IndieAuth specification](https://indieauth.spec.indieweb.org/) 2020-11-26
-- Introduces [IndieAuth server metadata endpoint](https://github.com/indieweb/indieauth/issues/43) which will be part of a future IndieAuth specification
+- Follows [IndieAuth specification](https://indieauth.spec.indieweb.org/) 2022-02-12
 
 ## [0.0.1] - 2016-03-17
 ### Added
