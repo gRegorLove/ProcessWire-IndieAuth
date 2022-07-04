@@ -22,7 +22,7 @@ use IndieAuth\AuthorizationCode;
 use IndieAuth\Server;
 use Mf2;
 
-class ProcessIndieAuth extends Process
+class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 {
     /**
      * Return information about this module
