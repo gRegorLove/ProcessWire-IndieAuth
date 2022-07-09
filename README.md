@@ -8,7 +8,8 @@ IndieAuth is an identity layer on top of OAuth 2.0. It can be used to obtain acc
 * ProcessWire 3
 
 ## Installation
-* Upload the plugin files to the `/site/modules` directory
+* Create directory `/site/modules/ProcessIndieAuth`
+* Upload the plugin files to that directory
 * Install the module from the ProcessWire admin
 * Copy the template files from `/extras/templates` into your `/site/templates` directory
 * Verify that the plugin installed pages:
