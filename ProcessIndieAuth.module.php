@@ -180,6 +180,15 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             }
         }
 
+        # attempt to un-publish the token-revocation-endpoint page
+        $endpoint = $this->pages->get('template=token-revocation-endpoint');
+        if (!($endpoint instanceof NullPage)) {
+            $endpoint->addStatus(Page::statusUnpublished);
+            if ($endpoint->save()) {
+                $this->message(sprintf('Unpublished page: %s', $endpoint->url));
+            }
+        }
+
         $this->uninstallPage();
     }
 
