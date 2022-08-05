@@ -1,0 +1,28 @@
+{
+    "profile_name": {
+        "name": "profile_name",
+        "label": "Profile Name",
+        "flags": 0,
+        "type": "FieldtypeText",
+        "collapsed": 0,
+        "minlength": 0,
+        "maxlength": 2048,
+        "showCount": 0,
+        "size": 0,
+        "textformatters": "",
+        "showIf": "",
+        "themeInputSize": "",
+        "themeInputWidth": "",
+        "themeOffset": "",
+        "themeBorder": "",
+        "themeColor": "",
+        "themeBlank": "",
+        "columnWidth": 100,
+        "required": "",
+        "requiredAttr": "",
+        "requiredIf": "",
+        "stripTags": "",
+        "placeholder": "",
+        "pattern": ""
+    }
+}
