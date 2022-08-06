@@ -91,22 +91,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         $fields = file_get_contents(__DIR__ . '/data/fields.json');
         $this->importFields($fields);
 
-        # attempt to add `profile_name` field to user template
-        $fieldgroup = $this->templates->get('user')->fieldgroup;
-        if (!$fieldgroup->has('profile_name')) {
-            $fieldgroup->add('profile_name');
-            if ($fieldgroup->save()) {
-                $this->message('Added field: profile_name');
-            }
-        }
-
-        # attempt to make the `profile_name` field editable in user's own profile
-        $profileFields = $this->modules->get('ProcessProfile')->profileFields;
-        if (is_array($profileFields) && !in_array('profile_name', $profileFields)) {
-            $profileFields[] = 'profile_name';
-            $this->modules->saveConfig('ProcessProfile', compact('profileFields'));
-            $this->message('Updated user profile fields', Notice::debug);
-        }
+        $this->addProfileFields();
 
         # attempt to set up the indieauth-metadata page
         $endpoint = $this->pages->get('template=indieauth-metadata-endpoint');
@@ -165,7 +150,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         $this->regenerateTokenSecret();
 
-        $this->message('To complete installation, ensure the template files indieauth-metadata-endpoint.php, authorization-endpoint.php, and token-endpoint.php are put in the /site/templates/ directory.');
+        $this->message('To complete installation, please follow the Setup directions in the readme file.');
     }
 
     public function ___uninstall(): void
@@ -1004,6 +989,10 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             }
         }
 
+        # canonize URLs
+        $request['client_id'] = Server::canonizeUrl($request['client_id']);
+        $request['redirect_uri'] = Server::canonizeUrl($request['redirect_uri']);
+
         # verify client_id
         $original_client_id = $decoded['client_id'] ?? '';
         if ($request['client_id'] !== $original_client_id) {
@@ -1431,6 +1420,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 'profile' => [
                     'name' => $user->get('profile_name'),
                     'url' => $this->wire('urls')->httpRoot,
+                    'photo' => $user->get('profile_photo_url'),
                 ],
             ]
         );
@@ -1649,6 +1639,35 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             } else {
                 $this->message(sprintf('Skipped existing field: %s', $name));
             }
+        }
+    }
+
+    private function addProfileFields(): void
+    {
+        # attempt to add profile fields to user template
+        $fieldgroup = $this->templates->get('user')->fieldgroup;
+        $fields_to_add = [
+            'profile_name',
+            'profile_photo_url',
+        ];
+
+        foreach ($fields_to_add as $name) {
+            if (!$fieldgroup->has($name)) {
+                $fieldgroup->add($name);
+                if ($fieldgroup->save()) {
+                    $this->message(sprintf('Added field: %s', $name));
+                }
+            }
+        }
+
+        # attempt to make new profile fields editable by user
+        $profileFields = $this->modules->get('ProcessProfile')->profileFields;
+        if ($missing_fields = array_diff($fields_to_add, $profileFields)) {
+            foreach ($missing_fields as $name) {
+                $profileFields[] = $name;
+            }
+            $this->modules->saveConfig('ProcessProfile', compact('profileFields'));
+            $this->message('Updated user profile fields', Notice::debug);
         }
     }
 
