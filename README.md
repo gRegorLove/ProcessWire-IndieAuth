@@ -8,20 +8,11 @@ IndieAuth is an identity layer on top of OAuth 2.0. It can be used to obtain acc
 * ProcessWire 3
 
 ## Installation
-The recommended method is to use the ProcessWire admin area’s module interface.
+The recommended method is to use the ProcessWire admin area’s module interface. If you prefer to install manually, see below.
 
 Navigate to Modules > New. In the Module Class Name field, enter `ProcessIndieAuth`.
 
-Continue with Setup below.
-
-## Installation from Github
-If you prefer to manually install:
-
-* Create directory `/site/modules/ProcessIndieAuth`
-* Upload the plugin files to that directory
-* Install the module from the ProcessWire admin
-
-Continue with Setup below.
+Continue with the [Setup](#setup) steps.
 
 ## Setup
 * Copy the template files from `/extras/templates` into your `/site/templates` directory
@@ -49,6 +40,15 @@ This should result in three `<link>` elements in the source HTML:
 	<link rel="token_endpoint" href="/token-endpoint/">
 </head>
 ```
+
+## Installation from Github
+If you prefer to manually install:
+
+* Create directory `/site/modules/ProcessIndieAuth`
+* Upload the plugin files to that directory
+* Install the module from the ProcessWire admin
+
+Continue with the [Setup](#setup) steps.
 
 ## Changelog
 * [Changelog](CHANGELOG.md)
