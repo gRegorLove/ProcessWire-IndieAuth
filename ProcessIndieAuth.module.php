@@ -311,7 +311,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     public function ___executeTokenSecret()
     {
         $this->regenerateTokenSecret();
-        $this->session->redirect($this->page->url, false);
+        $this->session->redirect($this->page->url, 302);
     }
 
     public function ___executeAuthorization(): array
@@ -322,7 +322,8 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         # missing part of the IndieAuth session
         if (!($request && $client)) {
-            $this->session->redirect($this->wire('config')->urls->admin, false);
+            $this->session->redirect($this->wire('config')->urls->admin, 302);
+        }
 
         if (!$this->user->hasRole('indieauth')) {
             $this->message('Sorry, your account does not have the IndieAuth access role on this site.');
@@ -380,7 +381,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 'iss' => $this->urls->httpRoot,
             ]);
 
-            $this->session->redirect($url, false);
+            $this->session->redirect($url, 302);
         }
     }
 
@@ -436,7 +437,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             }
 
             $this->message('Token has been revoked');
-            $this->session->redirect($this->page->url, false);
+            $this->session->redirect($this->page->url, 302);
         }
     }
 
@@ -592,11 +593,11 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             if ($user->isLoggedIn()) {
                 $moduleID = $this->modules->getModuleID($this);
                 $admin = $this->pages->get('process=' . $moduleID);
-                $this->session->redirect($admin->url . 'authorization', false);
+                $this->session->redirect($admin->url . 'authorization', 302);
             }
 
             # redirct to ProcessWire login
-            $this->session->redirect($this->wire('config')->urls->admin, false);
+            $this->session->redirect($this->wire('config')->urls->admin, 302);
 
         } elseif ($input->requestMethod('POST')) {
             $request = $input->post()->getArray();
@@ -1034,7 +1035,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
             $moduleID = $this->modules->getModuleID($this);
             $admin = $this->pages->get('process=' . $moduleID);
-            $this->session->redirect($admin->url . 'authorization', false);
+            $this->session->redirect($admin->url . 'authorization', 302);
         }
     }
 
@@ -1397,7 +1398,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             'error_description' => 'authorization request cancelled by the user',
             'state' => $request['state'],
         ]);
-        $this->session->redirect($url, false);
+        $this->session->redirect($url, 302);
     }
 
     /**
@@ -1433,7 +1434,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     private function redirectHttpResponse(string $redirect_uri, array $queryParams): void
     {
         $url = Server::buildUrlWithQueryString($redirect_uri, $queryParams);
-        $this->session->redirect($url, false);
+        $this->session->redirect($url, 302);
     }
 
     private function httpResponse($response, int $http_status = 400, array $headers = []): void
@@ -1566,7 +1567,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         }
 
         $this->error($message);
-        $this->session->redirect($url, false);
+        $this->session->redirect($url, 302);
     }
 
     private function regenerateTokenSecret(): void
