@@ -31,7 +31,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     {
         return [
             'title' => 'IndieAuth',
-            'version' => '020',
+            'version' => '021',
             'author' => 'gRegor Morrill, https://gregorlove.com/',
             'summary' => 'Use your domain name as an IndieAuth provider',
             'href' => 'https://indieauth.com/',
@@ -87,6 +87,11 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         $templates = file_get_contents(__DIR__ . '/data/templates.json');
         $this->importTemplates($templates);
+
+        $fields = file_get_contents(__DIR__ . '/data/fields.json');
+        $this->importFields($fields);
+
+        $this->addProfileFields();
 
         # attempt to set up the indieauth-metadata page
         $endpoint = $this->pages->get('template=indieauth-metadata-endpoint');
@@ -145,7 +150,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         $this->regenerateTokenSecret();
 
-        $this->message('To complete installation, ensure the template files indieauth-metadata-endpoint.php, authorization-endpoint.php, and token-endpoint.php are put in the /site/templates/ directory.');
+        $this->message('To complete installation, please follow the Setup directions in the readme file.');
     }
 
     public function ___uninstall(): void
@@ -173,6 +178,15 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         # attempt to un-publish the token-endpoint page
         $endpoint = $this->pages->get('template=token-endpoint');
+        if (!($endpoint instanceof NullPage)) {
+            $endpoint->addStatus(Page::statusUnpublished);
+            if ($endpoint->save()) {
+                $this->message(sprintf('Unpublished page: %s', $endpoint->url));
+            }
+        }
+
+        # attempt to un-publish the token-revocation-endpoint page
+        $endpoint = $this->pages->get('template=token-revocation-endpoint');
         if (!($endpoint instanceof NullPage)) {
             $endpoint->addStatus(Page::statusUnpublished);
             if ($endpoint->save()) {
@@ -297,7 +311,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     public function ___executeTokenSecret()
     {
         $this->regenerateTokenSecret();
-        $this->session->redirect($this->page->url, false);
+        $this->session->redirect($this->page->url, 302);
     }
 
     public function ___executeAuthorization(): array
@@ -308,7 +322,12 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         # missing part of the IndieAuth session
         if (!($request && $client)) {
-            $this->session->redirect($this->wire('config')->urls->admin, false);
+            $this->session->redirect($this->wire('config')->urls->admin, 302);
+        }
+
+        if (!$this->user->hasRole('indieauth')) {
+            $this->message('Sorry, your account does not have the IndieAuth access role on this site.');
+            $this->session->redirect($this->config->urls->admin, 302);
         }
 
         if ($input->requestMethod('GET')) {
@@ -325,15 +344,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 );
             }
 
-            $scopes = [];
-            if (array_key_exists('scope', $request)) {
-                $scopes = array_filter(
-                    array_map(
-                        'trim',
-                        explode(' ', $request['scope'])
-                    )
-                );
-            }
+            $scopes = $this->spaceSeparatedToArray($request['scope'] ?? '');
 
             if (!$scopes) {
                 $this->headline('Authenticate');
@@ -370,8 +381,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 'iss' => $this->urls->httpRoot,
             ]);
 
-            $this->session->removeAllFor('IndieAuth');
-            $this->session->redirect($url, false);
+            $this->session->redirect($url, 302);
         }
     }
 
@@ -427,7 +437,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             }
 
             $this->message('Token has been revoked');
-            $this->session->redirect($this->page->url, false);
+            $this->session->redirect($this->page->url, 302);
         }
     }
 
@@ -578,15 +588,16 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
             $this->session->setFor('IndieAuth', 'request', $request);
             $this->session->setFor('IndieAuth', 'client', $client);
+            $this->session->setFor('IndieAuth', 'user_id', $this->user->id);
 
             if ($user->isLoggedIn()) {
                 $moduleID = $this->modules->getModuleID($this);
                 $admin = $this->pages->get('process=' . $moduleID);
-                $this->session->redirect($admin->url . 'authorization', false);
+                $this->session->redirect($admin->url . 'authorization', 302);
             }
 
             # redirct to ProcessWire login
-            $this->session->redirect($this->wire('config')->urls->admin, false);
+            $this->session->redirect($this->wire('config')->urls->admin, 302);
 
         } elseif ($input->requestMethod('POST')) {
             $request = $input->post()->getArray();
@@ -797,6 +808,8 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         $client_id = $decoded['client_id'] ?? '';
         $scope = $decoded['scope'] ?? '';
 
+        $scopes = $this->spaceSeparatedToArray($decoded['scope'] ?? '');
+
         # authorization_code has scope(s), generate an access token
         if ($scope) {
             $token_data = $this->addToken($decoded);
@@ -815,6 +828,11 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 $token_data
             );
 
+            if (in_array('profile', $scopes)) {
+                $response = $this->addProfileToResponse($response);
+            }
+
+            $this->session->removeAllFor('IndieAuth');
             $this->log->save('indieauth', sprintf('Granted access token to %s with scope "%s"', $client_id, $scope));
             $this->httpResponse($response, 200);
         }
@@ -822,6 +840,12 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         # authentication-only response
         $me = $this->wire('urls')->httpRoot;
         $response = compact('me');
+
+        if (in_array('profile', $scopes)) {
+            $response = $this->addProfileToResponse($response);
+        }
+
+        $this->session->removeAllFor('IndieAuth');
         $this->log->save('indieauth', sprintf('Signed in to %s as %s', $request['client_id'], $me));
         $this->httpResponse($response, 200);
     }
@@ -970,6 +994,10 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             }
         }
 
+        # canonize URLs
+        $request['client_id'] = Server::canonizeUrl($request['client_id']);
+        $request['redirect_uri'] = Server::canonizeUrl($request['redirect_uri']);
+
         # verify client_id
         $original_client_id = $decoded['client_id'] ?? '';
         if ($request['client_id'] !== $original_client_id) {
@@ -1007,7 +1035,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
             $moduleID = $this->modules->getModuleID($this);
             $admin = $this->pages->get('process=' . $moduleID);
-            $this->session->redirect($admin->url . 'authorization', false);
+            $this->session->redirect($admin->url . 'authorization', 302);
         }
     }
 
@@ -1370,13 +1398,43 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             'error_description' => 'authorization request cancelled by the user',
             'state' => $request['state'],
         ]);
-        $this->session->redirect($url, false);
+        $this->session->redirect($url, 302);
+    }
+
+    /**
+     * When `profile` scope is requested, add profile to the response body
+     * If the user's `profile_name` is not set, profile will not be included
+     * in the response body.
+     *
+     * TODO: optionally add profile photo
+     * @see https://indieauth.spec.indieweb.org/#profile-information
+     */
+    private function addProfileToResponse(array $response): array
+    {
+        $user_id = $this->session->getFor('IndieAuth', 'user_id');
+        $user = $this->users->get($user_id);
+
+        if (!$user->get('profile_name')) {
+            $this->log->save('indieauth', 'Missing profile name in user account');
+            return $response;
+        }
+
+        return array_merge(
+            $response,
+            [
+                'profile' => [
+                    'name' => $user->get('profile_name'),
+                    'url' => $this->wire('urls')->httpRoot,
+                    'photo' => $user->get('profile_photo_url'),
+                ],
+            ]
+        );
     }
 
     private function redirectHttpResponse(string $redirect_uri, array $queryParams): void
     {
         $url = Server::buildUrlWithQueryString($redirect_uri, $queryParams);
-        $this->session->redirect($url, false);
+        $this->session->redirect($url, 302);
     }
 
     private function httpResponse($response, int $http_status = 400, array $headers = []): void
@@ -1452,6 +1510,20 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         return $info;
     }
 
+    private function spaceSeparatedToArray(string $input): array
+    {
+        if (!$input) {
+            return [];
+        }
+
+        return array_filter(
+            array_map(
+                'trim',
+                explode(' ', $input)
+            )
+        );
+    }
+
     private function secondsToString(int $input): string
     {
         $minute = 60;
@@ -1483,7 +1555,6 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
      * Perform a redirect with an error message
      * @param string $message
      * @param string $url
-     * @access public
      */
     private function handleErrorRedirect(string $message = '', string $url = ''): void
     {
@@ -1496,7 +1567,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         }
 
         $this->error($message);
-        $this->session->redirect($url, false);
+        $this->session->redirect($url, 302);
     }
 
     private function regenerateTokenSecret(): void
@@ -1547,11 +1618,70 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         }
     }
 
+    /**
+     * Import templates from JSON or array
+     * @param string|array $json
+     * @see https://processwire.com/talk/topic/9007-utility-to-help-generate-module-install-function/?do=findComment&comment=86995
+     */
+    private function importFields($json): void
+    {
+        $data = is_array($json) ? $json : wireDecodeJSON($json);
+
+        foreach ($data as $name => $field_data) {
+            # get rid of the ID so it doesn't conflict
+            unset($field_data['id']);
+
+            # field doesn't exist already; create it
+            if (!$this->fields->get($name)) {
+                $field = new Field();
+                $field->name = $name;
+
+                # import the data for the field
+                $field->setImportData($field_data);
+                $field->save();
+
+                $this->message(sprintf('Added field: %s', $name));
+            } else {
+                $this->message(sprintf('Skipped existing field: %s', $name));
+            }
+        }
+    }
+
+    private function addProfileFields(): void
+    {
+        # attempt to add profile fields to user template
+        $fieldgroup = $this->templates->get('user')->fieldgroup;
+        $fields_to_add = [
+            'profile_name',
+            'profile_photo_url',
+        ];
+
+        foreach ($fields_to_add as $name) {
+            if (!$fieldgroup->has($name)) {
+                $fieldgroup->add($name);
+                if ($fieldgroup->save()) {
+                    $this->message(sprintf('Added field: %s', $name));
+                }
+            }
+        }
+
+        # attempt to make new profile fields editable by user
+        $profileFields = $this->modules->get('ProcessProfile')->profileFields;
+        if ($missing_fields = array_diff($fields_to_add, $profileFields)) {
+            foreach ($missing_fields as $name) {
+                $profileFields[] = $name;
+            }
+            $this->modules->saveConfig('ProcessProfile', compact('profileFields'));
+            $this->message('Updated user profile fields', Notice::debug);
+        }
+    }
+
     private function installRole(): void
     {
         $role = $this->roles->get('indieauth');
         if ($role instanceof NullPage) {
             $this->roles->add('indieauth');
+            $this->message('Added role: indieauth');
         }
     }
 

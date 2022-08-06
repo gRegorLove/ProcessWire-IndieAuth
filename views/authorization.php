@@ -18,6 +18,10 @@ foreach ($scopes as $scope) {
     );
 }
 $display_scopes .= PHP_EOL . '</ul>';
+
+if (in_array('profile', $scopes)) {
+    $display_scopes .= PHP_EOL . '<p> If you select profile, the app will be provided the name and photo from your profile. </p>';
+}
 ?>
 
 <form method="post" action="<?=$this->page->url?>authorization">

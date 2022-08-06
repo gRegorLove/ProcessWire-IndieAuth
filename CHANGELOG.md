@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Added missing token-revocation-endpoint template
+- Added `profile_name` and `profile_photo_url` fields to user template and editable profile
+- Added support for clients requesting profile information
 
 ## [0.2.0] - 2022-07-04
 ### Changed
