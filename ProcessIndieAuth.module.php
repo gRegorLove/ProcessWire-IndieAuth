@@ -323,6 +323,10 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         # missing part of the IndieAuth session
         if (!($request && $client)) {
             $this->session->redirect($this->wire('config')->urls->admin, false);
+
+        if (!$this->user->hasRole('indieauth')) {
+            $this->message('Sorry, your account does not have the IndieAuth access role on this site.');
+            $this->session->redirect($this->config->urls->admin, 302);
         }
 
         if ($input->requestMethod('GET')) {
