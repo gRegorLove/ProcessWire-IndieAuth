@@ -1,6 +1,6 @@
 {
     "require": {
-        "firebase/php-jwt": "^5.0",
+        "firebase/php-jwt": "^6.0",
         "mf2/mf2": "^0.4.6",
         "barnabywalters/mf-cleaner": "^0.1.4"
     },
