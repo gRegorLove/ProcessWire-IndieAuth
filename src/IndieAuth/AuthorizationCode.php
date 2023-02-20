@@ -13,10 +13,10 @@ declare(strict_types=1);
 namespace IndieAuth;
 
 use Exception;
-use Firebase\JWT\BeforeValidException;
-use Firebase\JWT\ExpiredException;
-use Firebase\JWT\JWT;
-use Firebase\JWT\SignatureInvalidException;
+use Firebase\JWT\{
+    JWT,
+    Key
+};
 use function ProcessWire\wire;
 
 final class AuthorizationCode
@@ -75,14 +75,14 @@ final class AuthorizationCode
             $data['token_lifetime'] = $token_lifetime;
         }
 
-        $this->value = JWT::encode($data, $secret);
+        $this->value = JWT::encode($data, $secret, 'HS256');
     }
 
     public static function decode(string $code, string $secret): ?array
     {
         try {
             JWT::$leeway = 30;
-            $decoded = (array) JWT::decode($code, $secret, ['HS256']);
+            $decoded = (array) JWT::decode($code, new Key($secret, 'HS256'));
             return $decoded;
         } catch (Exception $e) {
             return null;
