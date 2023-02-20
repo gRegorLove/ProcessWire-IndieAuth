@@ -4,25 +4,28 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "062e0afbe1b2dc5ba178eec1b766f65e",
+    "content-hash": "7479127af8d779a219373339e0b96058",
     "packages": [
         {
             "name": "barnabywalters/mf-cleaner",
-            "version": "v0.1.4",
+            "version": "v0.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/barnabywalters/php-mf-cleaner.git",
-                "reference": "ef6a16628db6e8aee2b4f8bb8093d18c24b74cd4"
+                "reference": "bf86945ccb24093294bd266ee9e874917e762680"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/barnabywalters/php-mf-cleaner/zipball/ef6a16628db6e8aee2b4f8bb8093d18c24b74cd4",
-                "reference": "ef6a16628db6e8aee2b4f8bb8093d18c24b74cd4",
+                "url": "https://api.github.com/repos/barnabywalters/php-mf-cleaner/zipball/bf86945ccb24093294bd266ee9e874917e762680",
+                "reference": "bf86945ccb24093294bd266ee9e874917e762680",
                 "shasum": ""
             },
+            "require": {
+                "php": ">=7.3"
+            },
             "require-dev": {
-                "php": ">=5.3",
-                "phpunit/phpunit": "*"
+                "phpunit/phpunit": "~9",
+                "vimeo/psalm": "~4"
             },
             "suggest": {
                 "mf2/mf2": "To parse microformats2 structures from (X)HTML"
@@ -30,7 +33,7 @@
             "type": "library",
             "autoload": {
                 "files": [
-                    "src/BarnabyWalters/Mf2/Functions.php"
+                    "src/functions.php"
                 ]
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -46,9 +49,9 @@
             "description": "Cleans up microformats2 array structures",
             "support": {
                 "issues": "https://github.com/barnabywalters/php-mf-cleaner/issues",
-                "source": "https://github.com/barnabywalters/php-mf-cleaner/tree/v0.1.4"
+                "source": "https://github.com/barnabywalters/php-mf-cleaner/tree/v0.2.0"
             },
-            "time": "2014-10-06T23:11:15+00:00"
+            "time": "2022-11-15T20:04:09+00:00"
         },
         {
             "name": "firebase/php-jwt",
@@ -115,25 +118,27 @@
         },
         {
             "name": "mf2/mf2",
-            "version": "0.4.6",
+            "version": "v0.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/microformats/php-mf2.git",
-                "reference": "00b70ee7eb7f5b0585b1bd467f6c9cbd75055d23"
+                "reference": "ddc56de6be62ed4a21f569de9b80e17af678ca50"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/microformats/php-mf2/zipball/00b70ee7eb7f5b0585b1bd467f6c9cbd75055d23",
-                "reference": "00b70ee7eb7f5b0585b1bd467f6c9cbd75055d23",
+                "url": "https://api.github.com/repos/microformats/php-mf2/zipball/ddc56de6be62ed4a21f569de9b80e17af678ca50",
+                "reference": "ddc56de6be62ed4a21f569de9b80e17af678ca50",
                 "shasum": ""
             },
             "require": {
-                "php": ">=5.4.0"
+                "php": ">=5.6.0"
             },
             "require-dev": {
-                "mf2/tests": "@dev",
-                "phpdocumentor/phpdocumentor": "v2.8.4",
-                "phpunit/phpunit": "4.8.*"
+                "dealerdirect/phpcodesniffer-composer-installer": "^0.7",
+                "mf2/tests": "dev-master#e9e2b905821ba0a5b59dab1a8eaf40634ce9cd49",
+                "phpcompatibility/php-compatibility": "^9.3",
+                "phpunit/phpunit": "^5.7",
+                "squizlabs/php_codesniffer": "^3.6.2"
             },
             "suggest": {
                 "barnabywalters/mf-cleaner": "To more easily handle the canonical data php-mf2 gives you",
@@ -169,9 +174,9 @@
             ],
             "support": {
                 "issues": "https://github.com/microformats/php-mf2/issues",
-                "source": "https://github.com/microformats/php-mf2/tree/master"
+                "source": "https://github.com/microformats/php-mf2/tree/v0.5.0"
             },
-            "time": "2018-08-24T14:47:04+00:00"
+            "time": "2022-02-10T01:05:27+00:00"
         }
     ],
     "packages-dev": [

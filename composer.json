@@ -1,8 +1,8 @@
 {
     "require": {
         "firebase/php-jwt": "^6.0",
-        "mf2/mf2": "^0.4.6",
-        "barnabywalters/mf-cleaner": "^0.1.4"
+        "mf2/mf2": "^0.5",
+        "barnabywalters/mf-cleaner": "^0.2"
     },
     "require-dev": {
         "phpunit/phpunit": "^8.4"
