@@ -13,7 +13,7 @@ declare(strict_types=1);
 namespace IndieAuth;
 
 use Exception;
-use Firebase\JWT\{
+use IndieAuth\Libs\Firebase\JWT\{
     JWT,
     Key
 };

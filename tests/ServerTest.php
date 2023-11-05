@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ProcessWire;
+namespace IndieAuth\Tests;
 
 use IndieAuth\Server;
 use PHPUnit\Framework\TestCase;

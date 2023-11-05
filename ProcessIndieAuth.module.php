@@ -17,10 +17,16 @@ use DateTime;
 use Exception;
 use PDO;
 use PDOException;
-use Barnabywalters\Mf2 as Mf2Helper;
-use IndieAuth\AuthorizationCode;
-use IndieAuth\Server;
-use Mf2;
+use IndieAuth\{
+    AuthorizationCode,
+    Server
+};
+use IndieAuth\Libs\{
+    Barnabywalters\Mf2 as Mf2Helper,
+    Mf2
+};
+// use IndieAuth\Libs\;
+// use function IndieAuth\Libs\Mf2\parse;
 
 class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 {
@@ -48,6 +54,8 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     public function init(): void
     {
         require_once 'vendor/autoload.php';
+        // require_once 'build/vendor/scoper-autoload.php';
+        // require_once 'libs/vendor/autoload.php';
         $this->addHookAfter('Session::loginSuccess', $this, 'loginSuccess');
         if ($this->auto_revoke) {
             $this->addHook('LazyCron::every12Hours', $this, 'revokeExpiredTokens');

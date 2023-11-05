@@ -50,6 +50,29 @@ If you prefer to manually install:
 
 Continue with the [Setup](#setup) steps.
 
+## Updating Dependencies
+
+This section is intended for developers. Follow these steps when preparing a new release of the module. If you run into an issue with the dependencies on your server, you can also follow these steps. Please consider filing an issue as well, in case the conflict is something I can improve in the module.
+
+1. Delete the `vendor` folder
+2. Run `composer install`
+3. Check that `libs` folder is created and not empty
+4. Run `composer install --no-dev` to remove dev dependencies
+5. Check that the `vendor` folder only has composer autoload files, no dev dependencies
+
+Thanks to [this PR](https://github.com/Automattic/sensei/pull/6614) for help setting up this process.
+
+### Testing
+
+To run unit tests, you can use a globally installed version of phpunit, or run `composer require phpunit/phpunit ^8.4` to install it temporarily.
+
+After running tests, be sure to remove phpunit and dev dependencies again:
+
+1. Run `composer remove phpunit/phpunit`
+2. Run `composer install --no-dev`
+
+This gets you back to step step 4 above.
+
 ## Changelog
 * [Changelog](CHANGELOG.md)
 
