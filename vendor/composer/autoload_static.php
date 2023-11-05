@@ -4,21 +4,17 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInita3f135fc7ff74331d581d4d9b4d9ea9c
+class ComposerStaticInitfd0c30e4a16ae5d27443f8c89d3fe2e3
 {
     public static $files = array (
-        '75114ff88d0fe0413bbfd961d51cb0e3' => __DIR__ . '/..' . '/barnabywalters/mf-cleaner/src/BarnabyWalters/Mf2/Functions.php',
-        '757772e28a0943a9afe83def8db95bdf' => __DIR__ . '/..' . '/mf2/mf2/Mf2/Parser.php',
+        'e028e420ea1d245ced7d9e07c59e020e' => __DIR__ . '/../..' . '/libs/mf2/mf2/Mf2/Parser.php',
+        '5cd7e71b95ba7cc6cc22611a088f8653' => __DIR__ . '/../..' . '/libs/barnabywalters/mf-cleaner/src/functions.php',
     );
 
     public static $prefixLengthsPsr4 = array (
         'I' => 
         array (
             'IndieAuth\\' => 10,
-        ),
-        'F' => 
-        array (
-            'Firebase\\JWT\\' => 13,
         ),
     );
 
@@ -27,22 +23,44 @@ class ComposerStaticInita3f135fc7ff74331d581d4d9b4d9ea9c
         array (
             0 => __DIR__ . '/../..' . '/src/IndieAuth',
         ),
-        'Firebase\\JWT\\' => 
-        array (
-            0 => __DIR__ . '/..' . '/firebase/php-jwt/src',
-        ),
     );
 
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
+        'IndieAuth\\Libs\\BarnabyWalters\\Mf2\\CleanerTest' => __DIR__ . '/../..' . '/libs/barnabywalters/mf-cleaner/tests/CleanerTest.php',
+        'IndieAuth\\Libs\\Firebase\\JWT\\BeforeValidException' => __DIR__ . '/../..' . '/libs/firebase/php-jwt/src/BeforeValidException.php',
+        'IndieAuth\\Libs\\Firebase\\JWT\\CachedKeySet' => __DIR__ . '/../..' . '/libs/firebase/php-jwt/src/CachedKeySet.php',
+        'IndieAuth\\Libs\\Firebase\\JWT\\ExpiredException' => __DIR__ . '/../..' . '/libs/firebase/php-jwt/src/ExpiredException.php',
+        'IndieAuth\\Libs\\Firebase\\JWT\\JWK' => __DIR__ . '/../..' . '/libs/firebase/php-jwt/src/JWK.php',
+        'IndieAuth\\Libs\\Firebase\\JWT\\JWT' => __DIR__ . '/../..' . '/libs/firebase/php-jwt/src/JWT.php',
+        'IndieAuth\\Libs\\Firebase\\JWT\\JWTExceptionWithPayloadInterface' => __DIR__ . '/../..' . '/libs/firebase/php-jwt/src/JWTExceptionWithPayloadInterface.php',
+        'IndieAuth\\Libs\\Firebase\\JWT\\Key' => __DIR__ . '/../..' . '/libs/firebase/php-jwt/src/Key.php',
+        'IndieAuth\\Libs\\Firebase\\JWT\\SignatureInvalidException' => __DIR__ . '/../..' . '/libs/firebase/php-jwt/src/SignatureInvalidException.php',
+        'IndieAuth\\Libs\\Mf2\\Parser' => __DIR__ . '/../..' . '/libs/mf2/mf2/Mf2/Parser.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\ClassicMicroformatsTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/ClassicMicroformatsTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\CombinedMicroformatsTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/CombinedMicroformatsTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\MicroformatsTestSuiteTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/MicroformatsTestSuiteTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\MicroformatsWikiExamplesTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/MicroformatsWikiExamplesTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\ParseDTTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/ParseDTTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\ParseHtmlIdTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/ParseHtmlIdTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\ParseImpliedTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/ParseImpliedTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\ParseLanguageTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/ParseLanguageTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\ParsePTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/ParsePTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\ParseUTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/ParseUTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\ParseValueClassTitleTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/ParseValueClassTitleTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\ParserTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/ParserTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\PlainTextTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/PlainTextTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\RelTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/RelTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\TestSuiteParser' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/MicroformatsTestSuiteTest.php',
+        'IndieAuth\\Libs\\Mf2\\Parser\\Test\\UrlTest' => __DIR__ . '/../..' . '/libs/mf2/mf2/tests/Mf2/URLTest.php',
     );
 
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInita3f135fc7ff74331d581d4d9b4d9ea9c::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInita3f135fc7ff74331d581d4d9b4d9ea9c::$prefixDirsPsr4;
-            $loader->classMap = ComposerStaticInita3f135fc7ff74331d581d4d9b4d9ea9c::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInitfd0c30e4a16ae5d27443f8c89d3fe2e3::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInitfd0c30e4a16ae5d27443f8c89d3fe2e3::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInitfd0c30e4a16ae5d27443f8c89d3fe2e3::$classMap;
 
         }, null, ClassLoader::class);
     }
