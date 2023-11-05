@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Introspection Endpoint with HTTP Basic Authentication support
 - Admin: add clients and generate client_secrets for use with Client Credentials Flow
 - Admin: manually add a token with client_id and scopes -- for developer testing
+- Support for clients with h-x-app [#3](https://github.com/gRegorLove/ProcessWire-IndieAuth/issues/3)
 
 ### Changed
 - Noted refresh token expiration in the list of approved applications
