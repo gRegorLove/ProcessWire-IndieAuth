@@ -25,8 +25,6 @@ use IndieAuth\Libs\{
     Barnabywalters\Mf2 as Mf2Helper,
     Mf2
 };
-// use IndieAuth\Libs\;
-// use function IndieAuth\Libs\Mf2\parse;
 
 class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 {
@@ -54,8 +52,6 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     public function init(): void
     {
         require_once 'vendor/autoload.php';
-        // require_once 'build/vendor/scoper-autoload.php';
-        // require_once 'libs/vendor/autoload.php';
         $this->addHookAfter('Session::loginSuccess', $this, 'loginSuccess');
         if ($this->auto_revoke) {
             $this->addHook('LazyCron::every12Hours', $this, 'revokeExpiredTokens');
@@ -2070,6 +2066,10 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         $info['redirect_uri'] = $mf['rels']['redirect_uri'] ?? [];
 
         $apps = Mf2Helper\findMicroformatsByType($mf, 'h-app');
+
+        if (!$apps) {
+            $apps = Mf2Helper\findMicroformatsByType($mf, 'h-x-app');
+        }
 
         if (!$apps) {
             return $info;
