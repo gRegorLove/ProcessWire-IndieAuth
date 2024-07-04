@@ -1,35 +1,17 @@
 {
-    "require-dev": {
-        "mf2/mf2": "^0.5",
-        "barnabywalters/mf-cleaner": "^0.2",
-        "firebase/php-jwt": "^6.0",
-        "humbug/php-scoper": "^0.18.3"
-    },
     "autoload": {
-        "classmap": [
-            "libs/"
-        ],
-        "files": [
-            "libs/mf2/mf2/Mf2/Parser.php",
-            "libs/barnabywalters/mf-cleaner/src/functions.php"
-        ],
         "psr-4": {
             "IndieAuth\\": "src/IndieAuth/"
-        }
-    },
-    "scripts": {
-        "prefix-dependencies": [
-            "@php ./vendor/humbug/php-scoper/bin/php-scoper add-prefix --output-dir=./libs --config=config/php-scoper/scoper.inc.php --force --quiet"
+        },
+        "classmap": [
+            "scoped-libs/"
         ],
-        "pre-install-cmd": [
-            "mkdir -p libs"
-        ],
-        "pre-update-cmd": [
-            "mkdir -p libs"
-        ],
-        "post-autoload-dump": [
-            "@prefix-dependencies",
-            "composer dump-autoload --no-scripts"
+        "files": [
+            "scoped-libs/mf2/mf2/Mf2/Parser.php",
+            "scoped-libs/barnabywalters/mf-cleaner/src/functions.php"
         ]
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5"
     }
 }
