@@ -60,6 +60,38 @@ final class Server
     }
 
     /**
+     * Reserved for future use with Ticketing
+     *
+     * @see https://indieauth.spec.indieweb.org/#indieauth-server-metadata
+     */
+    public static function isIssuerValid(
+        string $issuer,
+        string $metadata_endpoint
+    ): bool {
+        if (!static::isClientIdValid($issuer)) {
+            return false;
+        }
+
+        $issuer = static::canonizeUrl($issuer);
+        $metadata_endpoint = static::canonizeUrl($metadata_endpoint);
+        $parts = parse_url($issuer);
+
+        if (!array_key_exists('scheme', $parts) || $parts['scheme'] != 'https') {
+            return false;
+        }
+
+        if (array_key_exists('query', $parts) || array_key_exists('fragment', $parts)) {
+            return false;
+        }
+
+        if (strpos($metadata_endpoint, $issuer) !== 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * @see https://indieauth.spec.indieweb.org/#url-canonicalization
      */
     public static function canonizeUrl(string $url): string
