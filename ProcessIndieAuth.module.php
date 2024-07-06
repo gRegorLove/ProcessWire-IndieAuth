@@ -35,7 +35,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     {
         return [
             'title' => 'IndieAuth',
-            'version' => '021',
+            'version' => '022',
             'author' => 'gRegor Morrill, https://gregorlove.com/',
             'summary' => 'Use your domain name as an IndieAuth provider',
             'href' => 'https://indieauth.com/',
