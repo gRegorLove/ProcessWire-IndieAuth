@@ -6,6 +6,6 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
-    'e028e420ea1d245ced7d9e07c59e020e' => $baseDir . '/libs/mf2/mf2/Mf2/Parser.php',
-    '5cd7e71b95ba7cc6cc22611a088f8653' => $baseDir . '/libs/barnabywalters/mf-cleaner/src/functions.php',
+    'eb9c22d6e1a07d2b2bf99fa9c6b4e857' => $baseDir . '/scoped-libs/mf2/mf2/Mf2/Parser.php',
+    'e543e19c14ae0c8c139d55822040dede' => $baseDir . '/scoped-libs/barnabywalters/mf-cleaner/src/functions.php',
 );
