@@ -926,9 +926,9 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
             $request['client_id'] = Server::canonizeUrl($request['client_id']);
             $request['redirect_uri'] = Server::canonizeUrl($request['redirect_uri']);
-            $client = $this->getClientInfo($request['client_id']);
+            $client = Server::getClientInfo($request['client_id']);
 
-            if (!Server::isRedirectUriAllowed($request['redirect_uri'], $request['client_id'], $client['redirect_uri'])) {
+            if (!Server::isRedirectUriAllowed($request['redirect_uri'], $request['client_id'], $client['redirect_uris'])) {
                 $this->httpResponse('mismatched redirect_uri');
             }
 
@@ -2038,6 +2038,11 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         exit;
     }
 
+    /**
+     * DEPRECATED
+     *
+     * @see Client::getInfo()
+     */
     private function getClientInfo(string $url): array
     {
         $info = array_fill_keys([
