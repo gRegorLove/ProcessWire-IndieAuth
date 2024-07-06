@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for clients with h-x-app [#3](https://github.com/gRegorLove/ProcessWire-IndieAuth/issues/3)
 
 ### Changed
+- Updated client information discovery [#5](https://github.com/gRegorLove/ProcessWire-IndieAuth/issues/5)
 - Noted refresh token expiration in the list of approved applications
+- Scoped dependencies to avoid namespace collisions when other plugins have same dependencies
 
 ## [0.2.1] - 2022-08-06
 ### Added
