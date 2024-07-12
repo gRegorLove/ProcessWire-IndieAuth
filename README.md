@@ -55,10 +55,11 @@ Continue with the [Setup](#setup) steps.
 This section is intended for developers. Follow these steps when preparing a new release of the module. If you run into an issue with the dependencies on your server, you can also follow these steps. Please consider filing an issue as well, in case the conflict is something I can improve in the module.
 
 1. Delete the `vendor` folder
-2. Run `composer install`
-3. Check that `libs` folder is created and not empty
-4. Run `composer install --no-dev` to remove dev dependencies
-5. Check that the `vendor` folder only has composer autoload files, no dev dependencies
+2. Run `env COMPOSER=scoped-composer.json composer install`
+3. Check that `scoped-libs` folder is created and not empty
+4. Run `env COMPOSER=scoped-composer.json composer install --no-dev` to remove dev dependencies
+5. Run `env COMPOSER=composer.json composer dump-autoload`
+6. Check that the `vendor` folder only has composer autoload files, no dev dependencies
 
 Thanks to [this PR](https://github.com/Automattic/sensei/pull/6614) for help setting up this process.
 
@@ -69,9 +70,9 @@ To run unit tests, you can use a globally installed version of phpunit, or run `
 After running tests, be sure to remove phpunit and dev dependencies again:
 
 1. Run `composer remove phpunit/phpunit`
-2. Run `composer install --no-dev`
+2. Run `composer dump-autoload`
 
-This gets you back to step step 4 above.
+This gets you back to step step 5 above.
 
 ## Changelog
 * [Changelog](CHANGELOG.md)
