@@ -2,105 +2,105 @@
 
 declare(strict_types=1);
 
-namespace ProcessWire;
+namespace IndieAuth\Tests;
 
 use IndieAuth\Server;
 use PHPUnit\Framework\TestCase;
 
 class ServerTest extends TestCase
 {
-    public function testHasScheme()
+    public function testHasScheme(): void
     {
         $this->assertFalse(
             Server::isClientIdValid('example.com')
         );
     }
 
-    public function testSchemeHttp()
+    public function testSchemeHttp(): void
     {
         $this->assertTrue(
             Server::isClientIdValid('http://example.com')
         );
     }
 
-    public function testSchemeHttps()
+    public function testSchemeHttps(): void
     {
         $this->assertTrue(
             Server::isClientIdValid('https://example.com')
         );
     }
 
-    public function testSchemeOther()
+    public function testSchemeOther(): void
     {
         $this->assertFalse(
             Server::isClientIdValid('ftp://example.com')
         );
     }
 
-    public function testUser()
+    public function testUser(): void
     {
         $this->assertFalse(
             Server::isClientIdValid('http://user@example.com')
         );
     }
 
-    public function testUserPass()
+    public function testUserPass(): void
     {
         $this->assertFalse(
             Server::isClientIdValid('https://user:pass@example.com')
         );
     }
 
-    public function testDotPath()
+    public function testDotPath(): void
     {
         $this->assertFalse(
             Server::isClientIdValid('https://example.com/./')
         );
     }
 
-    public function testDoubleDotPath()
+    public function testDoubleDotPath(): void
     {
         $this->assertFalse(
             Server::isClientIdValid('https://example.com/../')
         );
     }
 
-    public function testFragment()
+    public function testFragment(): void
     {
         $this->assertFalse(
             Server::isClientIdValid('https://example.com/#id')
         );
     }
 
-    public function testIpv4()
+    public function testIpv4(): void
     {
         $this->assertFalse(
             Server::isClientIdValid('https://1.1.1.1')
         );
     }
 
-    public function testIpv6()
+    public function testIpv6(): void
     {
         $this->assertFalse(
             Server::isClientIdValid('https://[2606:4700:4700::1111]')
         );
     }
 
-    public function testIpv4Loopback()
+    public function testIpv4Loopback(): void
     {
         $this->assertTrue(
             Server::isClientIdValid('https://127.0.0.1')
         );
     }
 
-    public function testIpv6Loopback()
+    public function testIpv6Loopback(): void
     {
         $this->assertTrue(
             Server::isClientIdValid('https://[0000:0000:0000:0000:0000:0000:0000:0001]')
         );
     }
 
-    public function testCanonizedPath()
+    public function testCanonizedPath(): void
     {
         $this->assertEquals(
             Server::canonizeUrl('https://example.com'),
@@ -108,7 +108,7 @@ class ServerTest extends TestCase
         );
     }
 
-    public function testCanonizedSchemeHost()
+    public function testCanonizedSchemeHost(): void
     {
         $this->assertEquals(
             Server::canonizeUrl('Https://Example.Com/Path'),
@@ -116,7 +116,7 @@ class ServerTest extends TestCase
         );
     }
 
-    public function testRedirectUriSchemeMismatch()
+    public function testRedirectUriSchemeMismatch(): void
     {
         $this->assertFalse(
             Server::isRedirectUriAllowed(
@@ -126,7 +126,7 @@ class ServerTest extends TestCase
         );
     }
 
-    public function testRedirectUriHostMismatch()
+    public function testRedirectUriHostMismatch(): void
     {
         $this->assertFalse(
             Server::isRedirectUriAllowed(
@@ -136,7 +136,7 @@ class ServerTest extends TestCase
         );
     }
 
-    public function testRedirectUriPortMismatch()
+    public function testRedirectUriPortMismatch(): void
     {
         $this->assertFalse(
             Server::isRedirectUriAllowed(
@@ -146,7 +146,7 @@ class ServerTest extends TestCase
         );
     }
 
-    public function testBase64UrlEncode()
+    public function testBase64UrlEncode(): void
     {
         $this->assertEquals( Server::base64UrlEncode(''), '' );
         $this->assertEquals( Server::base64UrlEncode('f'), 'Zg' );
@@ -163,11 +163,57 @@ class ServerTest extends TestCase
         $this->assertEquals( Server::base64UrlEncode($data), 'uBR_fRaGMbusv1fMdGpYDQ' );
     }
 
-    public function testCodeVerifierValid()
+    public function testCodeVerifierValid(): void
     {
         $code_verifier = 'foobar';
         $code_challenge = Server::base64UrlEncode(hash('sha256', $code_verifier, true));
         $this->assertTrue( Server::isCodeVerifierValid($code_verifier, $code_challenge) );
+    }
+
+    public function testIssuerHttps(): void
+    {
+        $this->assertFalse(
+            Server::isIssuerValid(
+                'http://example.com',
+                'http://example.com/metadata-endpoint'
+            )
+        );
+        $this->assertTrue(
+            Server::isIssuerValid(
+                'https://example.com',
+                'https://example.com/metadata-endpoint'
+            )
+        );
+    }
+
+    public function testIssuerNoQuery(): void
+    {
+        $this->assertFalse(
+            Server::isIssuerValid(
+                'https://example.com/?issuer=1',
+                'https://example.com/metadata-endpoint'
+            )
+        );
+    }
+
+    public function testIssuerNoFragment(): void
+    {
+        $this->assertFalse(
+            Server::isIssuerValid(
+                'https://example.com/#issuer',
+                'https://example.com/metadata-endpoint'
+            )
+        );
+    }
+
+    public function testIssuerPrefix(): void
+    {
+        $this->assertTrue(
+            Server::isIssuerValid(
+                'https://example.com/',
+                'https://example.com/metadata/endpoint'
+            )
+        );
     }
 }
 

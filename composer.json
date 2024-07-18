@@ -1,15 +1,17 @@
 {
-    "require": {
-        "firebase/php-jwt": "^5.0",
-        "mf2/mf2": "^0.4.6",
-        "barnabywalters/mf-cleaner": "^0.1.4"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^8.4"
-    },
     "autoload": {
         "psr-4": {
             "IndieAuth\\": "src/IndieAuth/"
-        }
+        },
+        "classmap": [
+            "scoped-libs/"
+        ],
+        "files": [
+            "scoped-libs/mf2/mf2/Mf2/Parser.php",
+            "scoped-libs/barnabywalters/mf-cleaner/src/functions.php"
+        ]
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5"
     }
 }

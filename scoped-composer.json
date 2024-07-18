@@ -1,0 +1,28 @@
+{
+    "require-dev": {
+        "mf2/mf2": "^0.5",
+        "barnabywalters/mf-cleaner": "^0.2",
+        "firebase/php-jwt": "^6.0",
+        "humbug/php-scoper": "^0.18.3"
+    },
+    "autoload": {
+        "classmap": [
+            "scoped-libs/"
+        ]
+    },
+    "scripts": {
+        "prefix-dependencies": [
+            "@php ./vendor/humbug/php-scoper/bin/php-scoper add-prefix --config=config/php-scoper/scoper.inc.php --force --quiet"
+        ],
+        "pre-install-cmd": [
+            "mkdir -p scoped-libs"
+        ],
+        "pre-update-cmd": [
+            "mkdir -p scoped-libs"
+        ],
+        "post-autoload-dump": [
+            "@prefix-dependencies",
+            "composer dump-autoload --no-scripts"
+        ]
+    }
+}

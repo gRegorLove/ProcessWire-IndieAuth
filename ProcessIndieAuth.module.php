@@ -17,10 +17,14 @@ use DateTime;
 use Exception;
 use PDO;
 use PDOException;
-use Barnabywalters\Mf2 as Mf2Helper;
-use IndieAuth\AuthorizationCode;
-use IndieAuth\Server;
-use Mf2;
+use IndieAuth\{
+    AuthorizationCode,
+    Server
+};
+use IndieAuth\Libs\{
+    Barnabywalters\Mf2 as Mf2Helper,
+    Mf2
+};
 
 class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 {
@@ -31,7 +35,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     {
         return [
             'title' => 'IndieAuth',
-            'version' => '021',
+            'version' => '022',
             'author' => 'gRegor Morrill, https://gregorlove.com/',
             'summary' => 'Use your domain name as an IndieAuth provider',
             'href' => 'https://indieauth.com/',
@@ -82,6 +86,15 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 `token` varchar(255) NOT NULL DEFAULT '',
                 `refresh_expiration` datetime DEFAULT NULL,
                 `refresh_token` varchar(255) NOT NULL DEFAULT '',
+                PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $this->database->query("
+            CREATE TABLE IF NOT EXISTS `indieauth_clients` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `client_id` varchar(255) NOT NULL DEFAULT '',
+                `client_secret` varchar(255) NOT NULL DEFAULT '',
+                `redirect_uri` varchar(255) NOT NULL DEFAULT '',
                 PRIMARY KEY (`id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
@@ -157,6 +170,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     {
         $this->database->query("DROP TABLE IF EXISTS `indieauth_authorization_codes`");
         $this->database->query("DROP TABLE IF EXISTS `indieauth_tokens`");
+        $this->database->query("DROP TABLE IF EXISTS `indieauth_clients`");
 
         # attempt to un-publish the indieauth-metadata page
         $endpoint = $this->pages->get('template=indieauth-metadata-endpoint');
@@ -197,13 +211,13 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         $this->uninstallPage();
     }
 
-    public function ___execute(): array
+    public function execute(): array
     {
         $table = null;
         try {
             # get total tokens
             $statement = $this->database->query('
-                SELECT COUNT(*) FROm indieauth_tokens');
+                SELECT COUNT(*) FROM indieauth_tokens');
             $total = $statement->fetchColumn();
 
             if ($total == 0) {
@@ -233,6 +247,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                     ,issued_at
                     ,last_accessed
                     ,expiration
+                    ,refresh_expiration
                 FROM
                     indieauth_tokens
                 LIMIT
@@ -272,12 +287,22 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
                 $date_expiration = '—';
                 if ($row['expiration']) {
-                    $dt = new DateTime($row['expiration']);
+                    $dt_expires = new DateTime($row['expiration']);
                     $date_expiration = sprintf('<time datetime="%s" title="%s">%s</time>',
-                        $dt->format('c'),
-                        $dt->format('F j, Y g:ia'),
-                        $dt->format('F j, Y')
+                        $dt_expires->format('c'),
+                        $dt_expires->format('F j, Y g:ia'),
+                        $dt_expires->format('F j, Y')
                     );
+
+                    if ($row['refresh_expiration']) {
+                        $dt = new DateTime($row['refresh_expiration']);
+                        $date_expiration = sprintf('<b>R:</b> <time datetime="%s" title="Expired %s but can be refreshed until %s">%s</time>',
+                            $dt->format('c'),
+                            $dt_expires->format('F j, Y g:ia'),
+                            $dt->format('F j, Y g:ia'),
+                            $dt->format('F j, Y')
+                        );
+                    }
                 }
 
                 $dt = new DateTime($row['issued_at']);
@@ -441,6 +466,352 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         }
     }
 
+    public function executeClients(): array
+    {
+        Wire::setFuel('processHeadline', 'Clients');
+        $this->breadcrumbs->add(new Breadcrumb($this->page->url, 'IndieAuth'));
+
+        $table = null;
+        try {
+            # get total clients
+            $statement = $this->database->query('
+                SELECT COUNT(*) FROM indieauth_tokens');
+            $total = $statement->fetchColumn();
+
+            if ($total == 0) {
+                return compact('table');
+            }
+
+            $input = $this->wire('input');
+
+            # set up base PageArray, used for pagination links
+            $items_per_page = 20;
+            $start = ($input->pageNum - 1) * $items_per_page;
+            $end = $input->pageNum * $items_per_page;
+
+            $results = new PageArray();
+            $results->setTotal($total);
+            $results->setLimit($items_per_page);
+            $results->setStart($start);
+
+            $statement = $this->database->query("
+                SELECT
+                    id
+                    ,client_id
+                    ,redirect_uri
+                FROM
+                    indieauth_clients
+                LIMIT
+                    {$start}, {$end}");
+
+            if ($statement->rowCount() == 0) {
+                return compact('table');
+            }
+
+            $table = $this->modules->get('MarkupAdminDataTable');
+            $table->setEncodeEntities(false);
+            $table->setResizable(true);
+            $table->headerRow([
+                'client_id',
+                'redirect_uri',
+            ]);
+
+            while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
+                $table->row([
+                    $row['client_id'],
+                    $row['redirect_uri'],
+                    'Regenerate Secret' => $this->page->url . 'regenerate-client-secret/' . $row['id'],
+                    'Delete' => $this->page->url . 'delete-client/' . $row['id'],
+                ]);
+            }
+
+            return compact('table', 'results');
+        } catch (PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error getting clients overview: %s', $e->getMessage()));
+            return [];
+        }
+    }
+
+    public function executeAddClient(): string
+    {
+        Wire::setFuel('processHeadline', 'Add Client');
+        $this->breadcrumbs->add(new Breadcrumb($this->page->url, 'IndieAuth'));
+
+        $form = $this->modules->get('InputfieldForm');
+        $form->attr('action', $this->page->url . 'add-client');
+
+        $wrapper = new InputfieldWrapper();
+        $wrapper->columnWidth = 50;
+        $wrapper->importArray(
+            [
+                [
+                    'type' => 'URL',
+                    'name' => 'client_id',
+                    'label' => 'Client ID',
+                    'description' => 'URL of client',
+                    'placeholder' => 'https://',
+                    'required' => true,
+                ],
+                [
+                    'type' => 'URL',
+                    'name' => 'redirect_uri',
+                    'label' => 'Redirect URI',
+                    'description' => 'Not currently used; may be used in the future',
+                    'placeholder' => 'https://',
+                ],
+                [
+                    'type' => 'submit',
+                    'value' => 'Submit',
+                ],
+            ]
+        );
+        $form->append($wrapper);
+
+        if ($this->input->requestMethod('POST')) {
+            $form->processInput($this->input->post);
+
+            if ($form->getErrors()) {
+                $this->error('Unable to save record. Please review the error messages below.');
+                return $form->render();
+            }
+
+            $client_id = $form->get('client_id')->value;
+
+            if ($this->doesClientIdExist($client_id)) {
+                $this->error('There is already a record for that client_id');
+                $this->session->redirect($this->page->url . 'clients', 302);
+            }
+
+            if ($client_secret = $this->addClient(compact('client_id'))) {
+                return sprintf('<h2> Client added successfully </h2> <p> Copy this secret and provide it to the client to use for authentication. This secret cannot be retrieved later, only regenerated. </p> client_secret: <code>%s</code>',
+                    $client_secret
+                );
+            }
+
+            $this->error('An unexpected error occurred');
+            $this->session->redirect($this->page->url . 'clients', 302);
+        }
+
+        return $form->render();
+    }
+
+    public function executeDeleteClient()
+    {
+        Wire::setFuel('processHeadline', 'Delete Client');
+        $this->breadcrumbs->add(new Breadcrumb($this->page->url, 'IndieAuth'));
+
+        $defaults = [];
+        if ($this->input->requestMethod('GET')) {
+            $record = $this->getClient((int) $this->input->urlSegment2);
+            if (!$record) {
+                $this->error('Invalid or missing ID in URL');
+                $this->session->redirect($this->page->url, 302);
+            }
+
+            $defaults = $record;
+        }
+
+        $form = $this->modules->get('InputfieldForm');
+        $form->attr('action', $this->page->url . 'delete-client');
+
+        $wrapper = new InputfieldWrapper();
+        $wrapper->columnWidth = 50;
+        $wrapper->importArray(
+            [
+                [
+                    'type' => 'URL',
+                    'name' => 'client_id',
+                    'label' => 'Client ID',
+                    'collapsed' => Inputfield::collapsedNoLocked,
+                ],
+                [
+                    'type' => 'checkbox',
+                    'name' => 'delete',
+                    'label' => 'Delete this client',
+                    'required' => true,
+                ],
+                [
+                    'type' => 'hidden',
+                    'name' => 'id',
+                ],
+                [
+                    'type' => 'submit',
+                    'value' => 'Submit',
+                ],
+            ]
+        );
+
+        if ($defaults) {
+            $wrapper->populateValues($defaults);
+        }
+
+        $form->append($wrapper);
+
+        if ($this->input->requestMethod('POST')) {
+            $form->processInput($this->input->post);
+
+            if ($form->getErrors()) {
+                $this->error('Unable to delete record. Please review the error messages below.');
+                return $form->render();
+            }
+
+            if ($this->deleteClient((int) $form->get('id')->value)) {
+                $this->message('Client deleted successfully');
+                $this->session->redirect($this->page->url . 'clients', 302);
+            }
+
+            $this->error('An unexpected error occurred');
+            $this->session->redirect($this->page->url . 'clients', 302);
+        }
+
+        return $form->render();
+    }
+
+    public function executeAddToken(): array
+    {
+        Wire::setFuel('processHeadline', 'Manually Add a Token');
+        $this->breadcrumbs->add(new Breadcrumb($this->page->url, 'IndieAuth'));
+
+        $form = $this->modules->get('InputfieldForm');
+        $form->attr('action', $this->page->url . 'add-token');
+
+        $wrapper = new InputfieldWrapper();
+        $wrapper->columnWidth = 50;
+        $wrapper->importArray(
+            [
+                [
+                    'type' => 'URL',
+                    'name' => 'client_id',
+                    'label' => 'Client ID',
+                    'description' => 'URL of client',
+                    'placeholder' => 'https://',
+                    'required' => true,
+                ],
+                [
+                    'type' => 'text',
+                    'name' => 'scope',
+                    'label' => 'Scope',
+                    'description' => 'Space-separated list of scopes',
+                    'value' => 'create',
+                    'required' => true,
+                ],
+                [
+                    'type' => 'hidden',
+                    'name' => 'id',
+                    'value' => '',
+                ],
+                [
+                    'type' => 'submit',
+                    'value' => 'Submit',
+                ],
+            ]
+        );
+        $form->append($wrapper);
+
+        if ($this->input->requestMethod('POST')) {
+            $form->processInput($this->input->post);
+
+            if ($form->getErrors()) {
+                $this->error('Unable to save record. Please review the error messages below.');
+                return $form->render();
+            }
+
+            $token_data = $this->addToken([
+                'id' => $form->get('id')->value,
+                'client_id' => $form->get('client_id')->value,
+                'scope' => $form->get('scope')->value,
+            ]);
+
+            if ($token_data) {
+                $this->message(sprintf('Access token added: %s',
+                    json_encode($token_data, JSON_PRETTY_PRINT)
+                ));
+                $this->session->redirect($this->page->url, 302);
+            }
+
+            $this->error('An unexpected error occurred');
+            $this->session->redirect($this->page->url, 302);
+        }
+
+        return compact('form');
+    }
+
+    public function executeRegenerateClientSecret()
+    {
+        Wire::setFuel('processHeadline', 'Regenerate Client Secret');
+        $this->breadcrumbs->add(new Breadcrumb($this->page->url, 'IndieAuth'));
+
+        $defaults = [];
+        if ($this->input->requestMethod('GET')) {
+            $record = $this->getClient((int) $this->input->urlSegment2);
+            if (!$record) {
+                $this->error('Invalid or missing ID in URL');
+                $this->session->redirect($this->page->url, 302);
+            }
+
+            $defaults = $record;
+        }
+
+        $form = $this->modules->get('InputfieldForm');
+        $form->attr('action', $this->page->url . 'regenerate-client-secret');
+
+        $wrapper = new InputfieldWrapper();
+        $wrapper->columnWidth = 50;
+        $wrapper->importArray(
+            [
+                [
+                    'type' => 'URL',
+                    'name' => 'client_id',
+                    'label' => 'Client ID',
+                    'collapsed' => Inputfield::collapsedNoLocked,
+                ],
+                [
+                    'type' => 'checkbox',
+                    'name' => 'regenerate',
+                    'label' => 'Regnerate the secret for this client',
+                    'description' => 'The current client secret will stop working immediately',
+                    'required' => true,
+                ],
+                [
+                    'type' => 'hidden',
+                    'name' => 'id',
+                ],
+                [
+                    'type' => 'submit',
+                    'value' => 'Submit',
+                ],
+            ]
+        );
+
+        if ($defaults) {
+            $wrapper->populateValues($defaults);
+        }
+
+        $form->append($wrapper);
+
+        if ($this->input->requestMethod('POST')) {
+            $form->processInput($this->input->post);
+
+            if ($form->getErrors()) {
+                $this->error('Unable to save record. Please review the error messages below.');
+                return $form->render();
+            }
+
+            $id = (int) $form->get('id')->value;
+
+            if ($client_secret = $this->regenerateClientSecret($id)) {
+                return sprintf('<h2> Client secret regenerated </h2> <p> Copy this secret and provide it to the client to use for authentication. This secret cannot be retrieved later, only regenerated. </p> client_secret: <code>%s</code>',
+                    $client_secret
+                );
+            }
+
+            $this->error('An unexpected error occurred');
+            $this->session->redirect($this->page->url . 'clients', 302);
+        }
+
+        return $form->render();
+    }
+
     /**
      * Get the HTML <link> elements for authorization and token endpoints
      */
@@ -555,9 +926,9 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
             $request['client_id'] = Server::canonizeUrl($request['client_id']);
             $request['redirect_uri'] = Server::canonizeUrl($request['redirect_uri']);
-            $client = $this->getClientInfo($request['client_id']);
+            $client = Server::getClientInfo($request['client_id']);
 
-            if (!Server::isRedirectUriAllowed($request['redirect_uri'], $request['client_id'], $client['redirect_uri'])) {
+            if (!Server::isRedirectUriAllowed($request['redirect_uri'], $request['client_id'], $client['redirect_uris'])) {
                 $this->httpResponse('mismatched redirect_uri');
             }
 
@@ -655,6 +1026,52 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 'error_description' => 'Invalid request',
             ]);
         }
+    }
+
+    /**
+     * Handle introspection endpoint requests
+     */
+    public function introspectionEndpoint(): void
+    {
+        $input = $this->wire('input');
+
+        if ($input->requestMethod('GET')) {
+            $this->httpResponse('Method not supported', 405, ['Allow' => 'POST']);
+        }
+
+        $client_id = $_SERVER['PHP_AUTH_USER'] ?? null;
+        $client_secret = $_SERVER['PHP_AUTH_PW'] ?? null;
+
+        if (!($client_id && $client_secret)) {
+            $this->httpResponse([
+                'error' => 'unauthorized',
+                'error_description' => 'Request must be authenticated',
+            ], 401, $this->authenticateHeaders('Basic'));
+        }
+
+        if (!$this->authenticateClient($client_id, $client_secret)) {
+            $this->httpResponse([
+                'error' => 'unauthorized',
+                'error_description' => 'Invalid authentication',
+            ], 401, $this->authenticateHeaders('Basic'));
+        }
+
+        $request = $input->post()->getArray();
+
+        $token_request = $request['token'] ?? null;
+        if (!$token_request) {
+            $this->httpResponse([
+                'error' => 'invalid_request',
+                'error_description' => 'Missing `token` parameter',
+            ]);
+        }
+
+        $response = $this->verifyToken($token_request);
+        if (!$response) {
+            $this->httpResponse(['active' => false], 200);
+        }
+
+        $this->httpResponse($response, 200);
     }
 
     /**
@@ -1166,7 +1583,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                     ,refresh_token = ?');
 
             $statement->execute([
-                $authorization['id'],
+                $authorization['id'] ?? '',
                 substr($token, -7),
                 $authorization['client_name'] ?? '',
                 $authorization['client_logo'] ?? '',
@@ -1385,6 +1802,154 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     }
 
     /**
+     * Note: since HTTP Basic Authentication uses ":" as user/pass
+     * separator, servers cannot send their URL with scheme as part
+     * of authenticated requests. Instead they'll send just the
+     * hostname and this method will assume https:// scheme.
+     *
+     * Hopefully this is fine, since ideally no one should be using
+     * unsecure (http://) clients or endpoints.
+     */
+    private function authenticateClient(
+        string $client_id,
+        string $client_secret
+    ): bool {
+        try {
+            $client_id = 'https://' . $client_id;
+
+            $statement = $this->database->prepare('
+                SELECT
+                    id
+                FROM
+                    indieauth_clients
+                WHERE
+                    client_id = ?
+                    AND client_secret = ?');
+
+            $statement->execute([
+                $client_id,
+                hash('sha256', $client_secret)
+            ]);
+
+            if ($statement->rowCount() == 0) {
+                return false;
+            }
+
+            return true;
+        } catch (PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error authenticating client: %s', $e->getMessage()));
+            return null;
+        }
+    }
+
+    private function doesClientIdExist(string $client_id): bool
+    {
+        try {
+            $client_id = Server::canonizeUrl($client_id);
+            $statement = $this->database->prepare('
+                SELECT
+                    id
+                FROM
+                    indieauth_clients
+                WHERE
+                    client_id = ?');
+            $statement->execute([$client_id]);
+
+            return ($statement->rowCount() > 0);
+        } catch (PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error checking if client_id exists: %s', $e->getMessage()));
+            return false;
+        }
+    }
+
+    private function addClient(array $data): ?string
+    {
+        try {
+            $client_secret = bin2hex(random_bytes(32));
+
+            $statement = $this->database->prepare('
+                INSERT INTO indieauth_clients SET
+                    client_id = ?
+                    ,client_secret = ?
+                    ,redirect_uri = ?');
+
+            $statement->execute([
+                Server::canonizeUrl($data['client_id']),
+                hash('sha256', $client_secret),
+                $data['redirect_uri'] ?? '',
+            ]);
+
+            return $client_secret;
+        } catch (PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error adding client: %s', $e->getMessage()));
+            return null;
+        }
+    }
+
+    private function getClient(int $id): ?array
+    {
+        try {
+            $statement = $this->database->prepare('
+                SELECT
+                    id
+                    ,client_id
+                    ,redirect_uri
+                FROM
+                    indieauth_clients
+                WHERE
+                    id = ?');
+
+            $statement->execute([$id]);
+            if ($statement->rowCount() > 0) {
+                return $statement->fetch(PDO::FETCH_ASSOC);
+            }
+
+            return null;
+        } catch (PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error getting client: %s', $e->getMessage()));
+            return null;
+        }
+    }
+
+    private function regenerateClientSecret(int $id): ?string
+    {
+        try {
+            $client_secret = bin2hex(random_bytes(32));
+
+            $statement = $this->database->prepare('
+                UPDATE indieauth_clients SET
+                    client_secret = ?
+                WHERE
+                    id = ?');
+
+            $statement->execute([
+                hash('sha256', $client_secret),
+                $id,
+            ]);
+
+            return $client_secret;
+        } catch (PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error regenerating client secret: %s', $e->getMessage()));
+            return null;
+        }
+    }
+
+    private function deleteClient(int $id): bool
+    {
+        try {
+            $statement = $this->database->prepare('
+                DELETE FROM indieauth_clients
+                WHERE
+                    id = ?');
+
+            return $statement->execute([$id]);
+        } catch(PDOException $e) {
+            $this->log->save('indieauth', sprintf('Error deleting client: %s', $e->getMessage()));
+            return false;
+        }
+    }
+
+    /**
      * Reset the IndieAuth session and redirect to the redirect_uri
      * with an access_denied error.
      */
@@ -1437,15 +2002,24 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         $this->session->redirect($url, 302);
     }
 
+    private function authenticateHeaders(string $type = 'Bearer'): array
+    {
+        return [
+            'WWW-Authenticate' => sprintf('%s realm="%s"',
+                $type,
+                $this->urls->httpRoot
+            ),
+        ];
+    }
+
+    /**
+     * @see authenticateHeaders() for 401/403 responses
+     */
     private function httpResponse($response, int $http_status = 400, array $headers = []): void
     {
         foreach ($headers as $key => $value) {
             $header = sprintf('%s: %s', $key, $value);
             header($header);
-        }
-
-        if ($http_status === 401) {
-            header(sprintf('WWW-Authenticate: Bearer realm="%s"', $this->urls->httpRoot));
         }
 
         http_response_code($http_status);
@@ -1464,6 +2038,11 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         exit;
     }
 
+    /**
+     * DEPRECATED
+     *
+     * @see Client::getInfo()
+     */
     private function getClientInfo(string $url): array
     {
         $info = array_fill_keys([
@@ -1492,6 +2071,10 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         $info['redirect_uri'] = $mf['rels']['redirect_uri'] ?? [];
 
         $apps = Mf2Helper\findMicroformatsByType($mf, 'h-app');
+
+        if (!$apps) {
+            $apps = Mf2Helper\findMicroformatsByType($mf, 'h-x-app');
+        }
 
         if (!$apps) {
             return $info;
