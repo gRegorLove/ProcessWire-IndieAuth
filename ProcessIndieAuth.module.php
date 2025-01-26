@@ -45,7 +45,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             'version' => '023',
             'author' => 'gRegor Morrill, https://gregorlove.com/',
             'summary' => 'Use your domain name as an IndieAuth provider',
-            'href' => 'https://indieauth.com/',
+            'href' => 'https://indieauth.net/',
             'requires' => [
                 'PHP>=7.0',
                 'ProcessWire>=3.0',
