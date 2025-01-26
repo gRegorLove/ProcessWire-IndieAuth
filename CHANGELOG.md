@@ -6,8 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- Adding profile information to token responses was not working correctly
-- Track ProcessWire user_id along with initial authorization code requests
+- Adding profile information to token responses was not working correctly [#6](https://github.com/gRegorLove/ProcessWire-IndieAuth/issues/6)
+- Install attempts to create the introspection-endpoint page [#7](https://github.com/gRegorLove/ProcessWire-IndieAuth/issues/7)
+
+### Changed
+- Admin: improve list of granted access in admin [#8](https://github.com/gRegorLove/ProcessWire-IndieAuth/issues/8)
+
+### Added
+- Add ability to disable backwards-compatible link-rels [#9](https://github.com/gRegorLove/ProcessWire-IndieAuth/issues/9)
+- Database schema version and automatic update process
 
 ## [0.2.2] - 2024-07-12
 ### Added
