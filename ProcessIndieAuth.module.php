@@ -168,6 +168,18 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             }
         }
 
+        # attempt to set up the introspection-endpoint page
+        $endpoint = $this->pages->get('template=introspection-endpoint');
+        if ($endpoint instanceof NullPage) {
+            $endpoint = new Page();
+            $endpoint->template = 'introspection-endpoint';
+            $endpoint->parent = 1;
+            $endpoint->title = 'Introspection Endpoint';
+            if ($endpoint->save()) {
+                $this->message(sprintf('Added page: %s', $endpoint->url));
+            }
+        }
+
         # attempt to add the admin page under Access
         $parent = $this->pages->get('template=admin, name=access');
         $this->installPage('IndieAuth', $parent, 'IndieAuth');
@@ -936,6 +948,12 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             $revocation_endpoint  = $endpoint->httpUrl;
         }
 
+        $introspection_endpoint  = '';
+        $endpoint = $this->pages->get('template=introspection-endpoint');
+        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
+            $introspection_endpoint  = $endpoint->httpUrl;
+        }
+
         $revocation_endpoint_auth_methods_supported = ['none'];
         $code_challenge_methods_supported = ['S256'];
         $authorization_response_iss_parameter_supported = true;
@@ -946,6 +964,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             'token_endpoint',
             'revocation_endpoint',
             'revocation_endpoint_auth_methods_supported',
+            'introspection_endpoint',
             'code_challenge_methods_supported',
             'authorization_response_iss_parameter_supported'
         );
