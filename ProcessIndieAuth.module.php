@@ -79,7 +79,6 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 `code_id` char(16) NOT NULL DEFAULT '',
                 `request` text NOT NULL,
                 `code` text NOT NULL,
-                `user_id` int unsigned NOT NULL DEFAULT '0',
                 `created` datetime NOT NULL,
                 `used` datetime DEFAULT NULL,
                 PRIMARY KEY (`id`)
