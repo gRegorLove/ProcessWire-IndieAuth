@@ -21,6 +21,7 @@ Continue with the [Setup](#setup) steps.
   * Authorization Endpoint
   * Token Endpoint
   * Token Revocation Endpoint
+  * Introspection Endpoint
   * IndieAuth page under the admin’s Access menu
 * Assign the `indieauth` role to any ProcessWire users that should be allowed to use IndieAuth
 * Update the home page template, adding the module’s `getLinkElements` to the `<head>` element:
@@ -40,6 +41,11 @@ This should result in three `<link>` elements in the source HTML:
 	<link rel="token_endpoint" href="/token-endpoint/">
 </head>
 ```
+
+The `rel="authorization_endpoint"` and `rel="token_endpoint"` links are for
+backwards compatibility because some software may not use the `indieauth-metadata`
+yet. If you would like to turn off those two, go to `Modules > Site > ProcessIndieAuth`
+in the admin area and check the box for: "Only advertise the IndieAuth Server Metadata endpoint"
 
 ## Installation from Github
 If you prefer to manually install:

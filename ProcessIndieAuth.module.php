@@ -29,16 +29,23 @@ use IndieAuth\Libs\{
 class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 {
     /**
+     * Schema version for database table used by this module
+     *
+     * @var int
+     */
+    const SCHEMA_VERSION = 1;
+
+    /**
      * Return information about this module
      */
     public static function getModuleInfo(): array
     {
         return [
             'title' => 'IndieAuth',
-            'version' => '022',
+            'version' => '023',
             'author' => 'gRegor Morrill, https://gregorlove.com/',
             'summary' => 'Use your domain name as an IndieAuth provider',
-            'href' => 'https://indieauth.com/',
+            'href' => 'https://indieauth.net/',
             'requires' => [
                 'PHP>=7.0',
                 'ProcessWire>=3.0',
@@ -52,6 +59,12 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     public function init(): void
     {
         require_once 'vendor/autoload.php';
+
+        # update the database schema
+        if ($this->schema_version < self::SCHEMA_VERSION) {
+            $this->updateDatabaseSchema();
+        }
+
         $this->addHookAfter('Session::loginSuccess', $this, 'loginSuccess');
         if ($this->auto_revoke) {
             $this->addHook('LazyCron::every12Hours', $this, 'revokeExpiredTokens');
@@ -154,6 +167,18 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             }
         }
 
+        # attempt to set up the introspection-endpoint page
+        $endpoint = $this->pages->get('template=introspection-endpoint');
+        if ($endpoint instanceof NullPage) {
+            $endpoint = new Page();
+            $endpoint->template = 'introspection-endpoint';
+            $endpoint->parent = 1;
+            $endpoint->title = 'Introspection Endpoint';
+            if ($endpoint->save()) {
+                $this->message(sprintf('Added page: %s', $endpoint->url));
+            }
+        }
+
         # attempt to add the admin page under Access
         $parent = $this->pages->get('template=admin, name=access');
         $this->installPage('IndieAuth', $parent, 'IndieAuth');
@@ -163,7 +188,52 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         $this->regenerateTokenSecret();
 
+        $this->updateSchemaVersion(self::SCHEMA_VERSION);
+
         $this->message('To complete installation, please follow the Setup directions in the readme file.');
+    }
+
+    public function updateDatabaseSchema(): void
+    {
+        $database = $this->wire('database');
+        $current_schema_version = (int) $this->get('schema_version');
+        $new_schema_version = null;
+
+        # apply schema updates in order, oldest to newest
+
+        # update to schema version 1
+        if ($current_schema_version < 1) {
+            try {
+                $database->query("ALTER TABLE `indieauth_tokens` ADD `client_uri` varchar(255) NOT NULL DEFAULT '' AFTER `client_id`");
+                $new_schema_version = 1;
+            } catch (PDOException $e) {
+                $this->error(
+                    sprintf('Error altering database schema: %s', $e->getMessage()),
+                    Notice::log
+                );
+            }
+        }
+
+        # update schema version if necessary
+        if ($current_schema_version < $new_schema_version) {
+            $this->updateSchemaVersion($new_schema_version);
+        }
+    }
+
+    private function updateSchemaVersion(int $schema_version): void
+    {
+        $this->message(
+            sprintf('Updating schema version of “%s” from: %d to: %d',
+                $this->className,
+                $this->schema_version ?? 0,
+                $schema_version
+            ),
+            Notice::log
+        );
+
+        $config = $this->modules->getModuleConfigData($this);
+        $config['schema_version'] = $schema_version;
+        $this->modules->saveModuleConfigData($this, $config);
     }
 
     public function ___uninstall(): void
@@ -243,6 +313,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                     ,client_name
                     ,client_icon
                     ,client_id
+                    ,IF(client_uri = '', client_id, client_uri) AS client_uri
                     ,scope
                     ,issued_at
                     ,last_accessed
@@ -270,18 +341,20 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 'Actions',
             ]);
 
+            $dt = new DateTime();
+
             while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
                 $client_name = ($row['client_name'])
                     ? $row['client_name']
-                    : $row['client_id'];
+                    : $row['client_uri'];
 
                 $date_accessed = '—';
                 if ($row['last_accessed']) {
-                    $dt = new DateTime($row['last_accessed']);
+                    $dt_accessed = new DateTime($row['last_accessed']);
                     $date_accessed = sprintf('<time datetime="%s" title="%s">%s</time>',
-                        $dt->format('c'),
-                        $dt->format('F j, Y g:ia'),
-                        $dt->format('F j, Y')
+                        $dt_accessed->format('c'),
+                        $dt_accessed->format('F j, Y g:ia'),
+                        $dt_accessed->format('F j, Y')
                     );
                 }
 
@@ -294,26 +367,26 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                         $dt_expires->format('F j, Y')
                     );
 
-                    if ($row['refresh_expiration']) {
-                        $dt = new DateTime($row['refresh_expiration']);
+                    if (($dt > $dt_expires) && $row['refresh_expiration']) {
+                        $dt_refresh = new DateTime($row['refresh_expiration']);
                         $date_expiration = sprintf('<b>R:</b> <time datetime="%s" title="Expired %s but can be refreshed until %s">%s</time>',
-                            $dt->format('c'),
+                            $dt_refresh->format('c'),
                             $dt_expires->format('F j, Y g:ia'),
-                            $dt->format('F j, Y g:ia'),
-                            $dt->format('F j, Y')
+                            $dt_refresh->format('F j, Y g:ia'),
+                            $dt_refresh->format('F j, Y')
                         );
                     }
                 }
 
-                $dt = new DateTime($row['issued_at']);
+                $dt_issued = new DateTime($row['issued_at']);
                 $date_issued = sprintf('<time datetime="%s" title="%s">%s</time>',
-                    $dt->format('c'),
-                    $dt->format('F j, Y g:ia'),
-                    $dt->format('F j, Y')
+                    $dt_issued->format('c'),
+                    $dt_issued->format('F j, Y g:ia'),
+                    $dt_issued->format('F j, Y')
                 );
 
                 $table->row([
-                    $client_name => $row['client_id'],
+                    $client_name => $row['client_uri'],
                     $row['scope'],
                     $date_accessed,
                     $date_expiration,
@@ -432,9 +505,10 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                     SELECT
                         id
                         ,ending
-                        ,client_name
+                        ,IF(client_name = "", client_id, client_name) AS client_name
                         ,client_icon
                         ,client_id
+                        ,IF(client_uri = "", client_id, client_uri) AS client_uri
                         ,scope
                         ,issued_at
                         ,last_accessed
@@ -826,18 +900,21 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             $output[] = '<!-- IndieAuth: no public page found with template=indieauth-metadata-endpoint -->';
         }
 
-        $endpoint = $this->pages->get('template=authorization-endpoint');
-        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
-            $output[] = sprintf('<link rel="authorization_endpoint" href="%s">', $endpoint->url);
-        } else {
-            $output[] = '<!-- IndieAuth: no public page found with template=authorization-endpoint -->';
-        }
+        # include backwards-compatible link-rels if they have not been disabled
+        if (!$this->only_advertise_metadata) {
+            $endpoint = $this->pages->get('template=authorization-endpoint');
+            if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
+                $output[] = sprintf('<link rel="authorization_endpoint" href="%s">', $endpoint->url);
+            } else {
+                $output[] = '<!-- IndieAuth: no public page found with template=authorization-endpoint -->';
+            }
 
-        $endpoint = $this->pages->get('template=token-endpoint');
-        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
-            $output[] = sprintf('<link rel="token_endpoint" href="%s">', $endpoint->url);
-        } else {
-            $output[] = '<!-- IndieAuth: no public page found with template=token-endpoint -->';
+            $endpoint = $this->pages->get('template=token-endpoint');
+            if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
+                $output[] = sprintf('<link rel="token_endpoint" href="%s">', $endpoint->url);
+            } else {
+                $output[] = '<!-- IndieAuth: no public page found with template=token-endpoint -->';
+            }
         }
 
         return implode(PHP_EOL, $output);
@@ -874,6 +951,12 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             $revocation_endpoint  = $endpoint->httpUrl;
         }
 
+        $introspection_endpoint  = '';
+        $endpoint = $this->pages->get('template=introspection-endpoint');
+        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
+            $introspection_endpoint  = $endpoint->httpUrl;
+        }
+
         $revocation_endpoint_auth_methods_supported = ['none'];
         $code_challenge_methods_supported = ['S256'];
         $authorization_response_iss_parameter_supported = true;
@@ -884,6 +967,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             'token_endpoint',
             'revocation_endpoint',
             'revocation_endpoint_auth_methods_supported',
+            'introspection_endpoint',
             'code_challenge_methods_supported',
             'authorization_response_iss_parameter_supported'
         );
@@ -955,11 +1039,16 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 }
             }
 
-            ## IndieAuth request is valid
+            # IndieAuth request is valid
+
+            ## track client and user information in the original request
+            $request['client_name'] = $client['name'];
+            $request['client_uri'] = $client['url'];
+            $request['user_id'] = $user->id;
 
             $this->session->setFor('IndieAuth', 'request', $request);
             $this->session->setFor('IndieAuth', 'client', $client);
-            $this->session->setFor('IndieAuth', 'user_id', $this->user->id);
+            $this->session->setFor('IndieAuth', 'user_id', $user->id);
 
             if ($user->isLoggedIn()) {
                 $moduleID = $this->modules->getModuleID($this);
@@ -1224,6 +1313,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         $client_id = $decoded['client_id'] ?? '';
         $scope = $decoded['scope'] ?? '';
+        $user_id = $decoded['user_id'] ?? null;
 
         $scopes = $this->spaceSeparatedToArray($decoded['scope'] ?? '');
 
@@ -1246,7 +1336,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             );
 
             if (in_array('profile', $scopes)) {
-                $response = $this->addProfileToResponse($response);
+                $response = $this->addProfileToResponse($response, $user_id);
             }
 
             $this->session->removeAllFor('IndieAuth');
@@ -1435,6 +1525,10 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         $this->useAuthorizationCode($id);
 
+        # add client information and user information to the decoded response
+        $decoded['client_uri'] = $original_request['client_uri'] ?? null;
+        $decoded['user_id'] = $original_request['user_id'] ?? null;
+
         return $decoded;
     }
 
@@ -1575,6 +1669,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                     ,client_name = ?
                     ,client_icon = ?
                     ,client_id = ?
+                    ,client_uri = ?
                     ,`scope` = ?
                     ,issued_at = NOW()
                     ,expiration = ?
@@ -1582,12 +1677,19 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                     ,refresh_expiration = ?
                     ,refresh_token = ?');
 
+            $client_id = $authorization['client_id'] ?? '';
+            $client_uri = $authorization['client_uri'] ?? '';
+            if (!$client_uri) {
+                $client_uri = $client_id;
+            }
+
             $statement->execute([
                 $authorization['id'] ?? '',
                 substr($token, -7),
                 $authorization['client_name'] ?? '',
                 $authorization['client_logo'] ?? '',
-                $authorization['client_id'] ?? '',
+                $client_id,
+                $client_uri,
                 $authorization['scope'] ?? '',
                 $expiration,
                 hash('sha256', $token),
@@ -1974,13 +2076,21 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
      * TODO: optionally add profile photo
      * @see https://indieauth.spec.indieweb.org/#profile-information
      */
-    private function addProfileToResponse(array $response): array
-    {
-        $user_id = $this->session->getFor('IndieAuth', 'user_id');
+    private function addProfileToResponse(
+        array $response,
+        $user_id = null
+    ): array {
+        if (!$user_id) {
+            return $response;
+        }
+
         $user = $this->users->get($user_id);
 
         if (!$user->get('profile_name')) {
-            $this->log->save('indieauth', 'Missing profile name in user account');
+            $this->log->save(
+                'indieauth',
+                sprintf('Missing profile name in user account (%s)', $user_id)
+            );
             return $response;
         }
 
