@@ -900,18 +900,21 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             $output[] = '<!-- IndieAuth: no public page found with template=indieauth-metadata-endpoint -->';
         }
 
-        $endpoint = $this->pages->get('template=authorization-endpoint');
-        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
-            $output[] = sprintf('<link rel="authorization_endpoint" href="%s">', $endpoint->url);
-        } else {
-            $output[] = '<!-- IndieAuth: no public page found with template=authorization-endpoint -->';
-        }
+        # include backwards-compatible link-rels if they have not been disabled
+        if (!$this->only_advertise_metadata) {
+            $endpoint = $this->pages->get('template=authorization-endpoint');
+            if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
+                $output[] = sprintf('<link rel="authorization_endpoint" href="%s">', $endpoint->url);
+            } else {
+                $output[] = '<!-- IndieAuth: no public page found with template=authorization-endpoint -->';
+            }
 
-        $endpoint = $this->pages->get('template=token-endpoint');
-        if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
-            $output[] = sprintf('<link rel="token_endpoint" href="%s">', $endpoint->url);
-        } else {
-            $output[] = '<!-- IndieAuth: no public page found with template=token-endpoint -->';
+            $endpoint = $this->pages->get('template=token-endpoint');
+            if (!($endpoint instanceof NullPage) && $endpoint->isPublic()) {
+                $output[] = sprintf('<link rel="token_endpoint" href="%s">', $endpoint->url);
+            } else {
+                $output[] = '<!-- IndieAuth: no public page found with template=token-endpoint -->';
+            }
         }
 
         return implode(PHP_EOL, $output);
