@@ -11,14 +11,16 @@ declare(strict_types=1);
 
 namespace ProcessWire;
 
-$client_name = ($client_name)
-    ? $client_name
-    : $client_id;
+$display_client_id = '';
+if ($client_id != $client_uri) {
+    $display_client_id .= PHP_EOL . sprintf('<br> <small>Client ID: %s</small>', $client_id);
+}
+
 ?>
 
 <p> <b>Are you sure you want to revoke this access token?</b> </p>
 
-<p> Client:<br> <a href="<?=$client_id;?>" target="_blank" rel="noopener"><?=$client_name;?></a> </p>
+<p> Client:<br> <a href="<?=$client_uri;?>" target="_blank" title="Link will open in a new window" rel="noopener"><?=$client_name;?></a> <?=$display_client_id?> </p>
 <p> Token Ending With:<br> <?=$ending;?> </p>
 <p> Scope:<br> <?=$scope;?> </p>
 <p> Issued:<br> <?=$issued_at;?> </p>
