@@ -29,5 +29,9 @@ $config = [
     'token_secret' => [
         'type' => 'hidden',
     ],
+    'schema_version' => [
+        'type' => 'hidden',
+        'value' => 0,
+    ],
 ];
 

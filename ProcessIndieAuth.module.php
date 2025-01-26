@@ -29,13 +29,20 @@ use IndieAuth\Libs\{
 class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 {
     /**
+     * Schema version for database table used by this module
+     *
+     * @var int
+     */
+    const SCHEMA_VERSION = 0;
+
+    /**
      * Return information about this module
      */
     public static function getModuleInfo(): array
     {
         return [
             'title' => 'IndieAuth',
-            'version' => '022',
+            'version' => '023',
             'author' => 'gRegor Morrill, https://gregorlove.com/',
             'summary' => 'Use your domain name as an IndieAuth provider',
             'href' => 'https://indieauth.com/',
@@ -52,6 +59,12 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
     public function init(): void
     {
         require_once 'vendor/autoload.php';
+
+        // placeholder for future: update the database schema:
+        /*if ($this->schema_version < self::SCHEMA_VERSION) {
+            $this->updateDatabaseSchema();
+        }*/
+
         $this->addHookAfter('Session::loginSuccess', $this, 'loginSuccess');
         if ($this->auto_revoke) {
             $this->addHook('LazyCron::every12Hours', $this, 'revokeExpiredTokens');
@@ -66,6 +79,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
                 `code_id` char(16) NOT NULL DEFAULT '',
                 `request` text NOT NULL,
                 `code` text NOT NULL,
+                `user_id` int unsigned NOT NULL DEFAULT '0',
                 `created` datetime NOT NULL,
                 `used` datetime DEFAULT NULL,
                 PRIMARY KEY (`id`)
@@ -163,7 +177,55 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         $this->regenerateTokenSecret();
 
+        $this->updateSchemaVersion(self::SCHEMA_VERSION);
+
         $this->message('To complete installation, please follow the Setup directions in the readme file.');
+    }
+
+    /**
+     * Placeholder for future schema updates
+     */
+    public function updateDatabaseSchema(): void
+    {
+        /*$database = $this->wire('database');
+        $current_schema_version = (int) $this->get('schema_version');
+        $new_schema_version = null;
+
+        # apply schema updates in order, oldest to newest
+
+        # placeholder: update to schema version 1
+        if ($current_schema_version < 1) {
+            try {
+                $database->query("ALTER TABLE `placeholder` ADD `placeholder_field2` int unsigned NOT NULL DEFAULT '0' AFTER `placeholder_field1`");
+                $new_schema_version = 1;
+            } catch (PDOException $e) {
+                $this->error(
+                    sprintf('Error altering database schema: %s', $e->getMessage()),
+                    Notice::log
+                );
+            }
+        }
+
+        # update schema version if necessary
+        if ($current_schema_version < $new_schema_version) {
+            $this->updateSchemaVersion($new_schema_version);
+        }*/
+    }
+
+    private function updateSchemaVersion(int $schema_version): void
+    {
+        $this->message(
+            sprintf('Updating schema version of “%s” from: %d to: %d',
+                $this->className,
+                $this->schema_version ?? 0,
+                $schema_version
+            ),
+            Notice::log
+        );
+
+        $config = $this->modules->getModuleConfigData($this);
+        $config['schema_version'] = $schema_version;
+        $this->modules->saveModuleConfigData($this, $config);
     }
 
     public function ___uninstall(): void
@@ -957,9 +1019,10 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
             ## IndieAuth request is valid
 
+            $request['user_id'] = $user->id;
             $this->session->setFor('IndieAuth', 'request', $request);
             $this->session->setFor('IndieAuth', 'client', $client);
-            $this->session->setFor('IndieAuth', 'user_id', $this->user->id);
+            $this->session->setFor('IndieAuth', 'user_id', $user->id);
 
             if ($user->isLoggedIn()) {
                 $moduleID = $this->modules->getModuleID($this);
@@ -1224,6 +1287,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
 
         $client_id = $decoded['client_id'] ?? '';
         $scope = $decoded['scope'] ?? '';
+        $user_id = $decoded['user_id'] ?? null;
 
         $scopes = $this->spaceSeparatedToArray($decoded['scope'] ?? '');
 
@@ -1246,7 +1310,7 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
             );
 
             if (in_array('profile', $scopes)) {
-                $response = $this->addProfileToResponse($response);
+                $response = $this->addProfileToResponse($response, $user_id);
             }
 
             $this->session->removeAllFor('IndieAuth');
@@ -1434,6 +1498,8 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
         }
 
         $this->useAuthorizationCode($id);
+
+        $decoded['user_id'] = $original_request['user_id'] ?? null;
 
         return $decoded;
     }
@@ -1974,13 +2040,21 @@ class ProcessIndieAuth extends Process implements Module, ConfigurableModule
      * TODO: optionally add profile photo
      * @see https://indieauth.spec.indieweb.org/#profile-information
      */
-    private function addProfileToResponse(array $response): array
-    {
-        $user_id = $this->session->getFor('IndieAuth', 'user_id');
+    private function addProfileToResponse(
+        array $response,
+        $user_id = null
+    ): array {
+        if (!$user_id) {
+            return $response;
+        }
+
         $user = $this->users->get($user_id);
 
         if (!$user->get('profile_name')) {
-            $this->log->save('indieauth', 'Missing profile name in user account');
+            $this->log->save(
+                'indieauth',
+                sprintf('Missing profile name in user account (%s)', $user_id)
+            );
             return $response;
         }
 
